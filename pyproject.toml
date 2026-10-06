@@ -1,0 +1,21 @@
+[project]
+name = "quantum8lines"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.2.1",
+    "kokoro-onnx>=0.6.1",
+    "manim>=0.21.0",
+    "numpy>=2.4.6",
+    "pydantic>=2.13.5",
+    "pytest>=9.1.1",
+    "soundfile>=0.14.0",
+    "streamlit>=1.65.0",
+    "sympy>=1.14.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -8,7 +8,8 @@ __pycache__/
 # VS Code
 .vscode/
 
-# Manim and temporary render output
+# Build and temporary render output
+build/
 media/
 temp_renders/
 
