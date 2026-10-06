@@ -1,0 +1,15 @@
+{
+  "id": "serious_cinematic_george",
+  "engine": "kokoro",
+  "voice": "bm_george",
+  "speed": 0.92,
+  "tone": "serious_cinematic",
+  "pause_ms": {
+    "sentence": 380,
+    "aha": 750
+  },
+  "lexicon": "brand/lexicon.json",
+  "postfx": "warm_narration",
+  "license_note": "Apache-2.0 License verified on https://huggingface.co/hexgrad/Kokoro-82M and https://github.com/hexgrad/kokoro. Permissive for commercial use.",
+  "status": "candidate"
+}
