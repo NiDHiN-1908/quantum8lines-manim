@@ -1,0 +1,11 @@
+{
+  "colors": {
+    "blue_dark": "#0a4b7c",
+    "blue_light": "#1e88e5",
+    "orange_dark": "#8c3b00",
+    "orange_light": "#f57c00",
+    "gold": "#ffb000",
+    "white_badge": "#ffffff",
+    "background": "#141518"
+  }
+}

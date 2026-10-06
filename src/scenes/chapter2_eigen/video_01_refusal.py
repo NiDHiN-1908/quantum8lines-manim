@@ -1,34 +1,24 @@
-# ===== BOOTSTRAP (DO NOT TOUCH) =====
-import sys
-from pathlib import Path
-
-ROOT_DIR = Path(__file__).resolve().parents[3]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.append(str(ROOT_DIR))
-# ===================================
-
 from manim import *
 import numpy as np
-
-from src.core.colors import *
-from src.core.camera import setup_scene
-from src.core.helpers import pause
 
 
 class EigenvectorRefusal(Scene):
     def construct(self):
-        setup_scene(self)
+        # -----------------------------
+        # Scene setup
+        # -----------------------------
+        self.camera.background_color = "#0e0e11"
 
-        # -------------------------------
-        # 1. Empty space (reset)
-        # -------------------------------
-        pause(self, 0.8)
+        # -----------------------------
+        # 1. Empty space (pause)
+        # -----------------------------
+        self.wait(0.8)
 
-        # -------------------------------
-        # 2. Create vectors
-        # -------------------------------
+        # -----------------------------
+        # 2. Create multiple vectors
+        # -----------------------------
         directions = [
-            np.array([1, 0, 0]),
+            np.array([1.0, 0.0, 0]),
             np.array([0.6, 0.8, 0]),
             np.array([-0.7, 0.5, 0]),
             np.array([-0.4, -0.9, 0]),
@@ -39,39 +29,36 @@ class EigenvectorRefusal(Scene):
         for d in directions:
             v = Arrow(
                 ORIGIN,
-                2 * d,
+                2.5 * d,
                 buff=0,
                 stroke_width=4,
-                color=STATIC,
+                color=GREY_B,
             )
             vectors.add(v)
 
-        self.play(FadeIn(vectors))
-        pause(self, 0.6)
+        self.play(FadeIn(vectors), run_time=1.2)
+        self.wait(0.5)
 
-        # -------------------------------
-        # 3. Mark the special direction
-        # -------------------------------
-        eigen_direction = np.array([1, 0, 0])
+        # -----------------------------
+        # 3. Mark the invariant direction
+        # -----------------------------
         eigen_vector = Arrow(
             ORIGIN,
-            2 * eigen_direction,
+            2.5 * np.array([1, 0, 0]),
             buff=0,
             stroke_width=6,
-            color=PRIMARY,
+            color=BLUE,
         )
 
         self.play(ReplacementTransform(vectors[0], eigen_vector))
-        pause(self, 0.6)
-
-        # Replace group
         vectors.remove(vectors[0])
         vectors.add(eigen_vector)
 
-        # -------------------------------
+        self.wait(0.6)
+
+        # -----------------------------
         # 4. Apply linear transformation
-        # -------------------------------
-        # This matrix stretches x and shears y
+        # -----------------------------
         transform_matrix = np.array([
             [2.0, 0.0],
             [0.6, 0.7],
@@ -82,22 +69,22 @@ class EigenvectorRefusal(Scene):
             run_time=2.5,
         )
 
-        # -------------------------------
-        # 5. Hold (let the viewer notice)
-        # -------------------------------
-        pause(self, 1.8)
+        # -----------------------------
+        # 5. Stillness (let it register)
+        # -----------------------------
+        self.wait(1.8)
 
-        # -------------------------------
-        # 6. Optional sentence (quiet)
-        # -------------------------------
+        # -----------------------------
+        # 6. Minimal sentence
+        # -----------------------------
         sentence = Text(
             "This direction doesn’t rotate.",
             font_size=36,
-            color=HIGHLIGHT,
+            color=GREY_A,
         ).to_edge(DOWN)
 
         self.play(FadeIn(sentence))
-        pause(self, 1.5)
+        self.wait(1.4)
         self.play(FadeOut(sentence))
 
-        pause(self, 1.0)
+        self.wait(1.0)
