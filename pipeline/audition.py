@@ -78,9 +78,30 @@ def render_audition_set(
         with open(script_path, "w", encoding="utf-8") as f:
             json.dump(chapter_script, f, indent=2)
 
-        # Synthesize and time
+        # Synthesize raw audio lines and narration
         t_start = time.perf_counter()
         timings = build_narration(profile_dir, profile, engine=engine)
+
+        # Generate postfx variants (normalized with profile.postfx preset)
+        audio_dir = profile_dir / "audio"
+        lines_postfx_dir = audio_dir / "lines_postfx"
+        lines_postfx_dir.mkdir(parents=True, exist_ok=True)
+
+        from pipeline.audio_fx import normalize
+        raw_narration_path = audio_dir / "narration.wav"
+        postfx_narration_path = audio_dir / "narration_postfx.wav"
+        normalize(raw_narration_path, postfx_narration_path, postfx=profile.postfx)
+
+        lines_raw_map = {}
+        lines_postfx_map = {}
+        for line in timings["lines"]:
+            line_id = line["id"]
+            raw_line = audio_dir / "lines" / f"{line_id}.wav"
+            postfx_line = lines_postfx_dir / f"{line_id}.wav"
+            normalize(raw_line, postfx_line, postfx=profile.postfx)
+            lines_raw_map[line_id] = str(raw_line)
+            lines_postfx_map[line_id] = str(postfx_line)
+
         render_time = time.perf_counter() - t_start
 
         entry = {
@@ -88,18 +109,22 @@ def render_audition_set(
             "voice": profile.voice,
             "speed": profile.speed,
             "tone": profile.tone,
+            "postfx_preset": profile.postfx,
             "render_time_sec": round(render_time, 3),
             "total_audio_duration_sec": timings["total_duration"],
             "lines_count": len(timings["lines"]),
-            "narration_wav": str(profile_dir / "audio" / "narration.wav"),
-            "timings_json": str(profile_dir / "audio" / "timings.json"),
+            "narration_wav": str(raw_narration_path),
+            "narration_postfx_wav": str(postfx_narration_path),
+            "lines_raw": lines_raw_map,
+            "lines_postfx": lines_postfx_map,
+            "timings_json": str(audio_dir / "timings.json"),
         }
         manifest_entries.append(entry)
 
         print(
             f"  [+] {profile.id:<28} | Voice: {profile.voice:<10} | "
-            f"Speed: {profile.speed:<4.2f} | Audio: {timings['total_duration']:<6.2f}s | "
-            f"Render: {render_time:<6.2f}s"
+            f"PostFX: {profile.postfx:<14} | Audio: {timings['total_duration']:<6.2f}s | "
+            f"Total: {render_time:<6.2f}s"
         )
 
     manifest_data = {
