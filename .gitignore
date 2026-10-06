@@ -8,8 +8,12 @@ __pycache__/
 # VS Code
 .vscode/
 
-# Manim output
+# Manim and temporary render output
 media/
+temp_renders/
+
+# Local models
+models/
 
 # OS
 .DS_Store
