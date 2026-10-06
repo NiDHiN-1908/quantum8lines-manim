@@ -183,3 +183,54 @@ def test_conformed_outputs_exist_and_conform(tmp_path):
         assert stream_info["width"] == expected["width"]
         assert stream_info["height"] == expected["height"]
         assert stream_info["r_frame_rate"] == expected["fps"]
+
+
+# ---------------------------------------------------------------------------
+# 6. Font Weight Ink Coverage Test
+# ---------------------------------------------------------------------------
+
+def test_inter_bold_ink_coverage():
+    """
+    Verify static Inter bold font has at least 20% more ink coverage than regular at 48 px.
+    Saves labeled side-by-side proof to temp_renders/font_weight_check.png.
+    """
+    import numpy as np
+    from manim import Scene, Text, VGroup, DOWN, tempconfig
+    from core.fonts import register_project_fonts, get_inter_font
+
+    register_project_fonts()
+    font_name = get_inter_font()
+
+    class FontCheckScene(Scene):
+        def construct(self):
+            t_reg = Text("Quantum8Lines Math 2026", font=font_name, weight="NORMAL", font_size=48)
+            lbl_reg = Text("Regular (NORMAL)", font=font_name, font_size=24, color="#71717a").next_to(t_reg, DOWN, buff=0.2)
+            group_reg = VGroup(t_reg, lbl_reg).shift([-3.2, 0, 0])
+
+            t_bold = Text("Quantum8Lines Math 2026", font=font_name, weight="BOLD", font_size=48)
+            lbl_bold = Text("Bold (BOLD)", font=font_name, font_size=24, color="#71717a").next_to(t_bold, DOWN, buff=0.2)
+            group_bold = VGroup(t_bold, lbl_bold).shift([3.2, 0, 0])
+
+            self.add(group_reg, group_bold)
+
+    Path("temp_renders").mkdir(exist_ok=True)
+    with tempconfig({"pixel_width": 1920, "pixel_height": 600, "frame_width": 16, "frame_height": 5, "verbosity": "ERROR"}):
+        scene = FontCheckScene()
+        scene.render()
+        img = scene.camera.get_image()
+        output_path = Path("temp_renders/font_weight_check.png")
+        img.save(str(output_path))
+        assert output_path.exists()
+
+    arr = np.array(img)
+    gray = np.mean(arr[:, :, :3], axis=2)
+    threshold = 30
+    reg_half = gray[:, :960]
+    bold_half = gray[:, 960:]
+
+    ink_reg = np.sum(reg_half > threshold)
+    ink_bold = np.sum(bold_half > threshold)
+    ink_ratio = (ink_bold - ink_reg) / ink_reg
+
+    # Bold must have at least 20% more ink than regular
+    assert ink_ratio >= 0.20, f"Bold ink increase ({ink_ratio*100:.1f}%) is below required 20%"
