@@ -1,41 +1,68 @@
-# Quantum8Lines Manim Videos
+# Quantum8Lines
 
-This repository contains Manim scenes and animations for Quantum8Lines.
+High-quality math and science explainer animations with 3Blue1Brown-style visual clarity and an automated generation pipeline.
 
-## Brand Assets & Sting Animations
+---
 
-We have built a beautiful brand sting animation (intro/outro) using native Manim shapes. The assets and colors are configured to be modular and reusable.
+## Quick Start
 
-### Configuration
-- Brand colors are configured in [config/brand.json](file:///c:/Users/nidhi/Desktop/quantum8lines-manim/config/brand.json).
-- The vector asset for the brain is located at [assets/brand/brain_icon.svg](file:///c:/Users/nidhi/Desktop/quantum8lines-manim/assets/brand/brain_icon.svg).
-
-### Rendering Scenes
-
-To render the brand intro and outro animations, run the following commands from the root directory of the workspace using the project's virtual environment:
-
-#### Draft Quality (Quick render, 480p, 15fps)
+### 1. Environment Setup
+Install dependencies and sync the pinned environment with [uv](https://docs.astral.sh/uv/):
 ```bash
-.venv/Scripts/manim -ql assets/brand/intro_outro.py Quantum8LinesIntro
-.venv/Scripts/manim -ql assets/brand/intro_outro.py Quantum8LinesOutro
+uv sync
 ```
 
-#### Medium Quality (720p, 30fps)
+Prerequisites on system PATH:
+- **Python 3.11**
+- **FFmpeg & FFprobe**
+- **LaTeX (MiKTeX / pdfTeX) & dvisvgm**
+
+### 2. Render Layout Still Frames (16:9 & 9:16)
+To verify frame safe-zones and region placement:
 ```bash
-.venv/Scripts/manim -qm assets/brand/intro_outro.py Quantum8LinesIntro
-.venv/Scripts/manim -qm assets/brand/intro_outro.py Quantum8LinesOutro
+uv run python -c "from pathlib import Path; from core.layout import LAYOUT_169, LAYOUT_916, render_layout_still; render_layout_still(LAYOUT_169, Path('temp_renders/layout_16x9.png')); render_layout_still(LAYOUT_916, Path('temp_renders/layout_9x16.png'))"
 ```
 
-#### High Quality (1080p, 60fps)
+### 3. Conform Brand Intro & Stings
+Conform the master brand intro into 16:9 (1080p30) and 9:16 vertical stings (candidates A & B) with loudnorm analysis:
 ```bash
-.venv/Scripts/manim -qh assets/brand/intro_outro.py Quantum8LinesIntro
-.venv/Scripts/manim -qh assets/brand/intro_outro.py Quantum8LinesOutro
+uv run python pipeline/conform.py
 ```
 
-#### Production Quality (4K, 60fps)
+### 4. Run Test Suite
 ```bash
-.venv/Scripts/manim -qk assets/brand/intro_outro.py Quantum8LinesIntro
-.venv/Scripts/manim -qk assets/brand/intro_outro.py Quantum8LinesOutro
+uv run pytest
 ```
 
-The rendered outputs will be placed in the `media/videos/intro_outro` directory.
+---
+
+## Repository Layout (SPEC.md Section 3)
+
+```
+quantum8lines-manim/
+├── SPEC.md
+├── brand/            intro/outro, logo, fonts, brand.json, mascot assets
+├── core/
+│   ├── tokens.py     design tokens loaded from brand/brand.json
+│   ├── fonts.py      font registration and Inter typography helpers
+│   ├── layout.py     16:9 + 9:16 layout engine, safe zones, LayoutTestScene
+│   ├── components/   vectors, matrices, graphs, equations, callouts, mascot
+│   ├── mathengine/   SymPy/NumPy fact computation + claim checkers
+│   └── scene_base.py base Scene with audio-first timing
+├── agents/           prompts (*.md) and schemas (*.py) per agent
+├── pipeline/         stage runners, state machine, checkpointing, conform.py
+├── topics/<topic>/
+│   ├── bible.json
+│   └── chapters/chNN/
+│       ├── script.json
+│       ├── facts.json
+│       ├── storyboard.json
+│       ├── scene.py
+│       ├── audio/    (tts wavs, timings.json, mix)
+│       ├── renders/  (916/, 169/)
+│       ├── qa/       (reports, sample frames)
+│       └── status.json
+├── review_ui/        local approval gates (Streamlit)
+├── tests/            automated tests and layout assertions
+└── models/           offline TTS models (Kokoro-82M + voices)
+```
