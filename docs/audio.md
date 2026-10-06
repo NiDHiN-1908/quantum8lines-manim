@@ -1,6 +1,6 @@
 # Audio Pipeline & Voice Lab Documentation
 
-This document describes the audio pipeline architecture, voice profiles, pronunciation lexicon, narration generation, and word-level forced alignment for Quantum8Lines animations, adhering to **SPEC.md Section 10 and Milestone M3a**.
+This document describes the audio pipeline architecture, voice profiles, pronunciation lexicon, narration generation, post-processing FX, loudness normalization, ducked mixing, word-level alignment, automated captions (ASS and SRT), and the interactive Voice Lab review application for Quantum8Lines animations, adhering to **SPEC.md Sections 4, 10, 11, 12, 14, and Milestones M3a & M3b**.
 
 ---
 
@@ -31,20 +31,37 @@ This document describes the audio pipeline architecture, voice profiles, pronunc
                               v          v
                   audio/lines/*.wav    audio/narration.wav
                               |
+                              +--------------------+
+                              |                    |
+                              v                    v
+                   +----------------------+   +-----------------------+
+                   | faster-whisper Align |   |  Audio FX & Loudnorm  |
+                   | (CUDA / CPU int8)    |   | (-14 LUFS, -1 dBTP)   |
+                   +----------+-----------+   +-----------+-----------+
+                              |                           |
+                              v                           v
+                     audio/timings.json        audio/narration_postfx.wav
+                 (word-level absolute timing)             |
+                              |                           v
+                              |               +-----------------------+
+                              |               | Ducked Mix with Music |
+                              |               +-----------------------+
                               v
-                   +----------------------+
-                   | faster-whisper Align | (CUDA / CPU int8)
-                   +----------+-----------+
+                  +-----------------------+
+                  |  Captions Generator   |
+                  | (ASS Highlight + SRT) |
+                  +-----------+-----------+
                               |
                               v
-                     audio/timings.json
-                 (word-level absolute timing)
+                  Burn-in / Video Assembly
 ```
 
 The pipeline follows an audio-first design:
 1. **Engine Decoupling:** Scenes and scripts never interact directly with speech models. The `TTSEngine` interface (`pipeline/tts/base.py`) abstracts synthesis.
 2. **Lexicon Isolation:** Spoken phonetic substitutions apply strictly to synthesis audio, leaving caption text untouched.
 3. **Audio-Driven Animation:** Animation timing derives from absolute word timestamps emitted by forced alignment.
+4. **Broadcast Standard Audio:** Loudness is normalized to -14 LUFS integrated with true peak $\le -1$ dBTP.
+5. **Dynamic Captions:** Burned ASS subtitles provide word-by-word highlighted text in the `HIGHLIGHT` token color.
 
 ---
 
@@ -55,25 +72,25 @@ Voice profiles are stored as JSON files under `brand/voices/<profile_id>.json` a
 ### Schema Fields
 - `id` (str): Unique identifier (e.g. `calm_curious_heart`).
 - `engine` (str): Engine adapter name (`kokoro`).
-- `voice` (str): Catalog voice ID discovered from engine.
+- `voice` (str): Catalog voice ID discovered dynamically from engine.
 - `speed` (float): Speaking rate multiplier (`0.5` to `2.0`).
 - `tone` (str): Preset tone (`calm_curious`, `energetic_playful`, `serious_cinematic`).
 - `pause_ms` (dict): Pause durations (`{"sentence": int, "aha": int}`).
 - `lexicon` (str): Path to pronunciation dictionary (`brand/lexicon.json`).
-- `postfx` (str): Post-processing FX chain identifier.
+- `postfx` (str): Post-processing FX chain identifier (`warm_narration`, `clean`).
 - `license_note` (str): Verified commercial license.
 - `status` (str): Status lifecycle (`candidate`, `approved`, `retired`).
 
 ### Candidate Profiles
 
-| Profile ID | Tone Preset | Voice ID | Speed | Sentence Pause | Aha Pause | Status |
-|---|---|---|---|---|---|---|
-| `calm_curious_heart` | `calm_curious` | `af_heart` | 0.95 | 320 ms | 650 ms | candidate |
-| `calm_curious_michael` | `calm_curious` | `am_michael` | 0.98 | 300 ms | 600 ms | candidate |
-| `energetic_playful_bella` | `energetic_playful` | `af_bella` | 1.08 | 260 ms | 500 ms | candidate |
-| `energetic_playful_adam` | `energetic_playful` | `am_adam` | 1.06 | 270 ms | 520 ms | candidate |
-| `serious_cinematic_george` | `serious_cinematic` | `bm_george` | 0.92 | 350 ms | 750 ms | candidate |
-| `serious_cinematic_fenrir` | `serious_cinematic` | `am_fenrir` | 0.90 | 340 ms | 700 ms | candidate |
+| Profile ID | Tone Preset | Voice ID | Speed | Sentence Pause | Aha Pause | PostFX Preset | Status |
+|---|---|---|---|---|---|---|---|
+| `calm_curious_heart` | `calm_curious` | `af_heart` | 0.95 | 320 ms | 650 ms | `warm_narration` | candidate |
+| `calm_curious_michael` | `calm_curious` | `am_michael` | 0.98 | 300 ms | 600 ms | `warm_narration` | candidate |
+| `energetic_playful_bella` | `energetic_playful` | `af_bella` | 1.08 | 260 ms | 500 ms | `warm_narration` | candidate |
+| `energetic_playful_adam` | `energetic_playful` | `am_adam` | 1.06 | 270 ms | 520 ms | `warm_narration` | candidate |
+| `serious_cinematic_george` | `serious_cinematic` | `bm_george` | 0.92 | 350 ms | 750 ms | `warm_narration` | candidate |
+| `serious_cinematic_fenrir` | `serious_cinematic` | `am_fenrir` | 0.90 | 340 ms | 700 ms | `warm_narration` | candidate |
 
 ### Kokoro License Verification
 - **Model:** Kokoro-82M ONNX (`kokoro-v1.0.int8.onnx` and `voices-v1.0.bin`).
@@ -121,27 +138,56 @@ timings = build_narration(chapter_dir="topics/linear_algebra/ch01", profile_id="
 
 ---
 
-## 5. Audition Set & Rendering (`pipeline/audition.py`)
+## 5. Loudness Normalization & PostFX (`pipeline/audio_fx.py`)
 
-The audition set (`brand/voices/audition_set.json`) tests voices across 5 pedagogical beats:
-1. `hook`: *"What if some arrows refuse to turn, no matter how hard you push?"*
-2. `explain`: *"A matrix takes every vector in the plane and moves it somewhere else. Most of them change direction. A few don't."*
-3. `equation`: *"A times v equals lambda times v. The matrix only stretches this vector. It never rotates it."*
-4. `aha`: *"And that's the whole idea. An eigenvector is simply a direction the transformation leaves alone."*
-5. `close`: *"Next time, we'll see why these special directions are everywhere."*
+Per **SPEC Section 10**:
+- Integrated Loudness Target: **-14 LUFS integrated** ($\pm 1.0$ LU).
+- Maximum True Peak: **-1.0 dBTP** (never clipping).
 
-### How to Render Audition Set
-Run:
-```bash
-uv run python -m pipeline.audition
-```
-Outputs are written to:
-- Audio lines and narration: `build/voice_audition/<profile_id>/audio/`
-- Manifest: `build/voice_audition/manifest.json`
+### PostFX Filter Presets
+Defined in `pipeline/audio_fx.py` as transparent FFmpeg filter chains:
+
+1. **`clean`** (`highpass=f=70`):
+   - Removes sub-bass rumble, ambient low-end vibration, and microphone handling noise below human vocal fundamentals (70 Hz) while preserving the natural spoken voice.
+2. **`warm_narration`** (`highpass=f=70,equalizer=f=200:t=q:w=1.0:g=1.5,acompressor=threshold=-18dB:ratio=2.5:attack=20:release=150`):
+   - `highpass=f=70`: High-pass rumble filter.
+   - `equalizer=f=200:t=q:w=1.0:g=1.5`: Adds subtle warmth in the lower midrange (200 Hz with Q=1.0, +1.5 dB) for an intimate, pedagogical presence.
+   - `acompressor`: Gentle, transparent compression (2.5:1 ratio, 20 ms attack, 150 ms release, -18 dB threshold) smoothing spoken dynamics without audible breathing or pumping artifacts.
+
+### Two-Pass Loudness Normalization (`normalize`)
+- **Pass 1:** Analyzes audio with `loudnorm=I=-14:TP=-1.0:LRA=11:print_format=json`.
+- **Pass 2:** Applies linear normalization using measured `input_i`, `input_tp`, `input_lra`, `input_thresh`, and `target_offset`.
+- Automatically retains video streams (`-c:v copy`) when normalizing video files (e.g. intros).
+
+### Ducked Audio Mixing (`mix`)
+When background music is added:
+- Music is attenuated (default `-18 dB`) so it never competes with the voice.
+- An FFmpeg `sidechaincompress` filter dynamically ducks the music by 4:1 whenever voice activity is present (attack 50 ms, release 300 ms).
+- Mixed with `amix` and normalized to -14 LUFS.
+
+### Conformed Intro Video Loudness Normalization
+All intro assets in `build/` are normalized to -14 LUFS:
+- `build/intro_169.mp4`: -33.09 LUFS $\to$ **-14.30 LUFS** (True Peak: -1.01 dBTP)
+- `build/intro_916_candidate_a.mp4`: -32.67 LUFS $\to$ **-13.88 LUFS** (True Peak: -0.97 dBTP)
+- `build/intro_916_candidate_b.mp4`: -33.59 LUFS $\to$ **-14.07 LUFS** (True Peak: -0.99 dBTP)
 
 ---
 
-## 6. Word-Level Alignment (`pipeline/align.py`)
+## 6. Captions Pipeline (`pipeline/captions.py`)
+
+Follows **SPEC Section 11**:
+- Format: Advanced SubStation Alpha (`.ass`) with word-by-word highlight, and plain `.srt`.
+- Typography: **Inter Bold**, white primary text (`&H00FFFFFF&`), active word highlighted in `HIGHLIGHT` token color (`#83c167` $\to$ `&H0067C183&`), dark background outline (`&H00110E0E&`).
+- Chunking: 3 to 5 words visible at any given moment, at most 2 lines.
+- Safe-Zone Positioning: Positioned strictly inside the `caption` region:
+  - In **16:9** (`PlayRes: 1920x1080`): Centered horizontally, bottom margin 148 px (lower third, below stage and above footer).
+  - In **9:16** (`PlayRes: 1080x1920`): Centered horizontally, bottom margin 568 px (comfortably above the 480 px reserved bottom UI area).
+- Text Verification (`check_caption_text`): Asserts that extracted caption words match script words 100% ignoring case and punctuation. Emits a unified diff on mismatch.
+- Burn-In Helper (`burn_captions`): Uses FFmpeg's `subtitles` filter with `fontsdir=brand/fonts` and robust Windows path escaping (colons and backslashes escaped).
+
+---
+
+## 7. Word-Level Alignment (`pipeline/align.py`)
 
 Forced alignment uses `faster-whisper` (`small` model) to extract word-level timestamps.
 
@@ -154,34 +200,37 @@ The alignment engine probes CUDA (`device="cuda"`, `compute_type="float16"`) wit
 ```bash
 uv run python -m pipeline.align
 ```
-This enriches each profile's `timings.json` with word-level entries:
-```json
-{
-  "word": "eigenvector",
-  "start": 0.42,
-  "end": 0.98,
-  "probability": 0.995,
-  "absolute_start": 3.72,
-  "absolute_end": 4.28
-}
-```
 
 ---
 
-## 7. M3a Audition & Alignment Benchmark Results
+## 8. Interactive Voice Lab (`review_ui/voice_lab.py`)
 
-Synthesized and aligned on Windows 11 with Kokoro-82M ONNX and faster-whisper-small:
+A local Streamlit application for reviewing, blind-testing, approving, and assigning voice profiles.
 
-| Profile ID | Voice | Speed | Audio Duration | Render Time | Alignment Time (CPU int8) | Word Error Rate (WER) |
-|---|---|---|---|---|---|---|
-| `calm_curious_heart` | `af_heart` | 0.95 | 28.55 s | 39.48 s | 18.26 s | **0.0%** |
-| `calm_curious_michael` | `am_michael` | 0.98 | 31.18 s | 35.70 s | 13.40 s | **0.0%** |
-| `energetic_playful_bella` | `af_bella` | 1.08 | 26.87 s | 31.06 s | 13.54 s | **4.0%** |
-| `energetic_playful_adam` | `am_adam` | 1.06 | 25.63 s | 29.55 s | 13.64 s | **2.6%** |
-| `serious_cinematic_george` | `bm_george` | 0.92 | 33.18 s | 36.71 s | 13.15 s | **0.0%** |
-| `serious_cinematic_fenrir` | `am_fenrir` | 0.90 | 30.65 s | 34.16 s | 13.14 s | **0.0%** |
+### How to Run Voice Lab
+```bash
+uv run streamlit run review_ui/voice_lab.py
+```
 
-### Device Benchmark Note
-- CUDA initialization probe failed with: `Library cublas64_12.dll is not found or cannot be loaded`.
-- Fallback to CPU (`int8`) completed smoothly across all 30 audio clips with an average alignment time of ~2.7s per line.
-- 4 of the 6 candidate profiles achieved a perfect **0.0% WER**, confirming the phonetic accuracy of Kokoro-82M and faster-whisper alignment.
+### Sections & Capabilities
+1. **Audition Tab:**
+   - Displays all 5 audition lines (`hook`, `explain`, `equation`, `aha`, `close`).
+   - Audio players for every candidate profile with a toggle between **Raw** and **PostFX (warm_narration)**.
+   - One-click re-rendering of audition clips.
+2. **Blind Test Tab:**
+   - Shuffles profiles under anonymous labels (`Voice A`, `Voice B`, ...).
+   - Collects listener name, naturalness ratings (1 to 5), and "would keep watching" (Yes/No).
+   - Supports uploading real human audio clips for baseline comparison.
+   - Reveals voice mapping only after ratings are saved to `brand/voices/scores.json`.
+3. **Results & Acceptance Tab:**
+   - Table of listeners, mean naturalness, keep-watching percentage, and pass/fail status.
+   - **Acceptance Rule (Documented Starting Assumptions):**
+     - Minimum **5 listeners**
+     - Mean naturalness $\ge$ **4.0 / 5.0**
+     - Keep-watching rate $\ge$ **70%**
+4. **Approve Profile Tab:**
+   - Approves profiles that meet the acceptance criteria.
+   - Allows "Approve with Override", requiring a documented non-empty reason stored in the profile JSON.
+5. **Assign to Topic Tab:**
+   - Restricts assignment strictly to approved profiles.
+   - Writes `voice_profile` into the target topic's `topics/<topic>/bible.json` (creating a minimal `bible.json` if absent).
