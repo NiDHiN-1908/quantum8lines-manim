@@ -154,6 +154,7 @@ The leftover `src/` folder from the legacy layout is removed in M0. Legacy code 
     {"id": "ch01", "title": "...", "one_idea": "...", "question_it_raises": "..."}
   ],
   "prereqs": [],
+  "voice_profile": "narrator_calm_01",
   "sources": ["textbook or reference names used to fact-check"]
 }
 ```
@@ -272,9 +273,47 @@ The vision model may add notes to G6, but only deterministic checks can fail a g
 4. If an animation cannot fit its audio window, the storyboard is revised (not the audio stretched).
 
 ### Voice
-- Default Kokoro voice chosen in M3 by listening to 5 candidates on the same 3 sample lines.
+- Voice is **always fully synthetic and always swappable**. No voice is hard-coded anywhere; every chapter uses a **voice profile** (see "Voice profiles and Voice Lab" below).
 - Pronunciation dictionary `brand/lexicon.json` maps terms to respellings; per-line overrides come from `script.json`.
 - Add 0.2-0.4 s of silence between sentences, longer (0.6 s) before the aha.
+
+### Voice profiles and Voice Lab
+
+**Engine abstraction.** `pipeline/tts` exposes one interface: `synthesize(text, profile) -> wav`. Each engine (Kokoro first) is an adapter. Adding or replacing an engine never touches scenes, scripts, or captions.
+
+**Voice profile** (`brand/voices/<id>.json`, validated by pydantic):
+```json
+{
+  "id": "narrator_calm_01",
+  "engine": "kokoro",
+  "voice": "<engine voice name>",
+  "speed": 1.0,
+  "tone": "calm, curious",
+  "pause_ms": {"sentence": 300, "aha": 600},
+  "lexicon": "brand/lexicon.json",
+  "postfx": "warm_narration",
+  "license_note": "where the model license was checked",
+  "status": "candidate"
+}
+```
+`status` is `candidate`, `approved`, or `retired`. Only `approved` profiles can be assigned to a topic for final renders.
+
+**Tone presets.** Ship at least three profiles per approved engine so the channel can switch style: `calm_curious` (default), `energetic_playful`, `serious_cinematic`. A tone differs by voice choice, speed, pause lengths, and post-processing, never by changing the script text.
+
+**Voice Lab (review UI page, runs before any chapter is generated).**
+1. A fixed audition set of 5 lines: a hook, an explanatory sentence, an equation read aloud, an "aha" line, and a closing line.
+2. Every candidate profile renders the same set.
+3. The page offers side-by-side playback and a **blind mode** (profiles hidden, shuffled), with a 1-5 naturalness score and a "would keep watching" yes/no per clip.
+4. Approving a profile sets `status: approved` and stores the scores in `brand/voices/scores.json`.
+5. Assigning a profile to a topic writes `voice_profile` into that topic's `bible.json`.
+
+**Acceptance test for an approved voice:** blind-test about 10 listeners with the audition set mixed with clips of real human narration. The voice passes only if most listeners rate it natural and would keep watching. Record the result.
+
+**Rules**
+- One narrator voice per topic, so chapters of a topic sound consistent. Changing a topic's voice after chapters have shipped requires a human decision in the review UI.
+- Choose the voice **before** a chapter's storyboard is generated. Because timing is audio-first, a different voice changes line durations. After a voice swap, the pipeline re-runs from `tts` onward (checkpointing skips earlier stages), the storyboard timings are recomputed, and gates G5-G7 run again.
+- Mixing voices inside one chapter is not allowed until a multi-character dialogue format is specified in this spec.
+- Candidate engines to evaluate in M3: Kokoro first; others only if their license allows commercial use (checked on the model's repository) and they run on the hardware recorded in `docs/environment.md`.
 
 ### Loudness and music
 - Target about **-14 LUFS integrated**, true peak at or below **-1 dBTP**, for all exports.
@@ -318,7 +357,8 @@ Pages:
 3. **Storyboard:** beats and expected visuals.
 4. **Preview:** play the test render with the QA report and sample frames.
 5. **Final:** both exports, loudness report, caption check; approve (G8).
-6. **Status board:** every chapter, every stage, with failed gates highlighted and a button to re-run a single stage.
+6. **Voice Lab:** audition, blind-test, approve voice profiles, and assign one to a topic (section 10).
+7. **Status board:** every chapter, every stage, with failed gates highlighted and a button to re-run a single stage.
 
 ---
 
@@ -350,7 +390,7 @@ Pages:
 | M0 | Environment | `uv` project, pinned Manim 0.20.x and deps, `legacy` `src/` removed, hello scene renders in 16:9 and 9:16 |
 | M1 | Design system | tokens, layout engine with safe zones, intro/outro integration, 9:16 sting, font setup, tests green |
 | M2 | Components + math engine | vector, matrix, graph, equation, callout, mascot components; claim checkers with tests; reference-frame tests |
-| M3 | Audio pipeline | TTS, lexicon, alignment, ASS captions, loudness mix; a sample line set sounds good to you |
+| M3 | Audio pipeline | TTS engine interface, voice profiles (3 tone presets), Voice Lab page with blind mode, lexicon, alignment, ASS captions, loudness mix; at least one voice passes the blind acceptance test and is approved by you |
 | M4 | QA gates | G4-G7 implemented and demonstrably catching seeded errors (wrong number, off-screen object, overlapping text) |
 | M5 | Agents | all agents produce schema-valid output; prompts versioned; end-to-end dry run on a stub topic |
 | M6 | Pilot chapter | one chapter fully through all gates, both formats, approved by you |
@@ -380,7 +420,7 @@ Do not start a milestone before the previous one is done. Seeded-error tests in 
 ## 19. Open decisions
 
 - [ ] Pilot topic confirmed
-- [ ] Default Kokoro voice (decided by listening in M3)
+- [ ] Approved narrator voice profile(s), chosen in the Voice Lab in M3 (fully synthetic; no personal voice recording)
 - [ ] Alignment method (whisper size vs forced aligner), decided in M3 on accuracy and speed
 - [ ] Background music source
 - [ ] Whether the long video gets a synthesis chapter by default
