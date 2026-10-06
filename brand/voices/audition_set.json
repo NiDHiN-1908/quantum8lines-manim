@@ -1,0 +1,30 @@
+{
+  "chapter": "voice_audition",
+  "lines": [
+    {
+      "id": "hook",
+      "beat": "hook",
+      "text": "What if some arrows refuse to turn, no matter how hard you push?"
+    },
+    {
+      "id": "explain",
+      "beat": "explain",
+      "text": "A matrix takes every vector in the plane and moves it somewhere else. Most of them change direction. A few don't."
+    },
+    {
+      "id": "equation",
+      "beat": "equation",
+      "text": "A times v equals lambda times v. The matrix only stretches this vector. It never rotates it."
+    },
+    {
+      "id": "aha",
+      "beat": "aha",
+      "text": "And that's the whole idea. An eigenvector is simply a direction the transformation leaves alone."
+    },
+    {
+      "id": "close",
+      "beat": "close",
+      "text": "Next time, we'll see why these special directions are everywhere."
+    }
+  ]
+}
