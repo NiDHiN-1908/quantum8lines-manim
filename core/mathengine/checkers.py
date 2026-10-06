@@ -20,27 +20,9 @@ from sympy.parsing.sympy_parser import (
 import numpy as np
 
 from core.mathengine.schemas import Claim, ClaimStatus
+from core.mathengine.safe_parse import safe_parse, SafeParseError
 
-# SymPy parsing transformations
-TRANSFORMATIONS = standard_transformations + (
-    implicit_multiplication_application,
-    convert_xor,
-)
-
-
-def _safe_parse(expr_str: Any) -> Any:
-    """Parse string or return expression if already symbolic."""
-    if isinstance(expr_str, (sp.Basic, sp.Matrix)):
-        return expr_str
-    if isinstance(expr_str, (int, float)):
-        return sp.nsimplify(expr_str)
-    if isinstance(expr_str, str):
-        # Support '=' inside expression string by splitting into LHS - RHS
-        if "=" in expr_str and not any(op in expr_str for op in ["<=", ">=", "=="]):
-            lhs, rhs = expr_str.split("=", 1)
-            return parse_expr(lhs.strip(), transformations=TRANSFORMATIONS) - parse_expr(rhs.strip(), transformations=TRANSFORMATIONS)
-        return parse_expr(expr_str.strip(), transformations=TRANSFORMATIONS)
-    raise ValueError(f"Unsupported expression type: {type(expr_str)}")
+_safe_parse = safe_parse
 
 
 def check_equation_true(inputs: Dict[str, Any]) -> Tuple[ClaimStatus, Optional[str]]:

@@ -17,6 +17,7 @@ from core.mathengine.checkers import (
     check_plot_matches,
 )
 from core.mathengine.facts import Facts, UnverifiedClaimError
+from core.mathengine.safe_parse import safe_parse, SafeParseError
 
 __all__ = [
     "Claim",
@@ -34,4 +35,6 @@ __all__ = [
     "check_plot_matches",
     "Facts",
     "UnverifiedClaimError",
+    "safe_parse",
+    "SafeParseError",
 ]

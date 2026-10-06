@@ -17,11 +17,7 @@ from manim import Axes, Dot, MathTex, VGroup, UR
 
 from core.tokens import STATIC, PRIMARY, HIGHLIGHT, TEXT
 from core.layout import Layout, LAYOUT_169
-
-TRANSFORMATIONS = standard_transformations + (
-    implicit_multiplication_application,
-    convert_xor,
-)
+from core.mathengine.safe_parse import safe_parse
 
 
 class GraphPlot(VGroup):
@@ -74,14 +70,9 @@ class GraphPlot(VGroup):
         else:
             expr_raw = expression
 
-        # Parse to SymPy
+        # Parse to SymPy safely
         var_sym = sp.Symbol(variable)
-        if isinstance(expr_raw, str):
-            sym_expr = parse_expr(expr_raw.strip(), transformations=TRANSFORMATIONS)
-        elif isinstance(expr_raw, sp.Basic):
-            sym_expr = expr_raw
-        else:
-            raise ValueError(f"Unsupported expression type: {type(expr_raw)}")
+        sym_expr = safe_parse(expr_raw)
 
         # Create numpy callable via lambdify
         self.func_callable = sp.lambdify(var_sym, sym_expr, modules=["numpy"])

@@ -37,17 +37,28 @@ The test suite runs through `uv run pytest -v` without external service dependen
 Reference-frame tests render fixed visual frames of each component (`VectorArrow`, `MatrixView`, `GraphPlot`, `EquationLine`, `Callout`, `Mascot`) and compare the rendered pixels against golden reference PNGs stored in `tests/reference_frames/`.
 
 ### Cross-Machine Font & LaTeX Antialiasing
-Different machines, operating systems (Windows, Linux, macOS), and graphics drivers rasterize text and vector paths with minor subpixel antialiasing differences. LaTeX rendering via `dvisvgm` and text rendering via Pango/Cairo can vary by a few shades of grey along glyph edges.
+### Dual Comparison Criteria (Milestone M3a Step 0b)
+To accommodate benign antialiasing variations without compromising visual regression detection, comparisons use **two criteria**, and a frame fails if **EITHER** criterion is violated:
 
-To accommodate these benign antialiasing variations without compromising visual regression detection:
-- The comparison computes the **Mean Absolute Difference (MAD)** across all RGB channels:
-  $$\text{MAD} = \frac{1}{3 \cdot W \cdot H} \sum_{x, y, c} |I_{\text{current}}(x, y, c) - I_{\text{golden}}(x, y, c)|$$
-- **Documented Threshold**: `MAD <= 5.0` (on a 0–255 scale).
-- A threshold of 5.0 easily absorbs subtle font smoothing differences while failing immediately if:
-  - An element is missing or fails to render.
-  - An object moves or shifts location.
-  - A color token changes.
-  - Layout or scaling is distorted.
+1. **Mean Absolute Difference (MAD)** across all RGB channels:
+   $$\text{MAD} = \frac{1}{3 \cdot W \cdot H} \sum_{x, y, c} |I_{\text{current}}(x, y, c) - I_{\text{golden}}(x, y, c)|$$
+   - **Calibrated Threshold**: `MAD <= 0.40` (on a 0–255 scale).
+   - Identical re-renders yield `MAD = 0.0`. Benign font smoothing variations typically yield `MAD < 0.15`.
+   - Structural shifts or missing curves immediately cause `MAD > 0.50`, triggering a failure.
+
+2. **Outlier Pixel Percentage**:
+   - Computes the percentage of pixels whose color intensity in any RGB channel differs from the golden frame by more than **40 intensity levels**:
+     $$\text{Outlier Pixels} = \{ (x, y) \mid \max_c |I_{\text{current}}(x, y, c) - I_{\text{golden}}(x, y, c)| > 40 \}$$
+   - **Calibrated Threshold**: $\le 0.50\%$ of total pixels.
+   - If more than 0.5% of pixels diverge by $> 40$ intensity levels, the test reports a regression failure.
+
+### Aspect Ratios & Resolutions
+Reference frames are generated and verified for all 6 components across **both layouts**:
+- **16:9 Landscape**: `480x270` pixels (`tests/reference_frames/<comp>_169.png`).
+- **9:16 Portrait**: `270x480` pixels (`tests/reference_frames/<comp>_916.png`).
+
+### Negative Reference Tests
+Negative test cases in `tests/test_components.py` deliberately alter component parameters (e.g. inverted vector in `VectorArrow`, substituted curve in `GraphPlot`) and assert that the regression detector flags failures, proving that the verification criteria are actively catching visual anomalies.
 
 ### Updating Golden Reference Frames
 When intentional design changes or new component features are introduced, golden reference frames can be refreshed using the update switch:

@@ -309,3 +309,54 @@ def test_facts_require_verified_raises_on_unverifiable():
     with pytest.raises(UnverifiedClaimError) as exc_info:
         facts.require_verified("c_unverified")
     assert "status is 'unverifiable'" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# 10. Safe Formula Parsing Tests (Milestone M3a Step 0f)
+# ---------------------------------------------------------------------------
+
+from core.mathengine.safe_parse import safe_parse, SafeParseError
+import sympy as sp
+
+
+def test_safe_parse_valid_expressions():
+    """Whitelisted symbols (x, y, z, t, n) and math functions parse cleanly."""
+    e1 = safe_parse("x**2 + 2*x + 1")
+    assert sp.simplify(e1 - (sp.Symbol("x") + 1)**2) == 0
+
+    e2 = safe_parse("sin(x)**2 + cos(x)**2")
+    assert sp.simplify(e2 - 1) == 0
+
+    e3 = safe_parse("exp(t) * sqrt(y) / (z + n)")
+    assert isinstance(e3, sp.Basic)
+
+
+def test_safe_parse_rejects_double_underscores():
+    """Malicious strings with double underscores must raise SafeParseError without executing."""
+    with pytest.raises(SafeParseError) as exc_info:
+        safe_parse('__import__("os").system("echo hi")')
+    assert "Double underscores are prohibited" in str(exc_info.value)
+
+
+def test_safe_parse_rejects_attribute_access():
+    """Attribute access must raise SafeParseError."""
+    with pytest.raises(SafeParseError) as exc_info:
+        safe_parse("x.__class__")
+    assert "Double underscores" in str(exc_info.value) or "Attribute access" in str(exc_info.value)
+
+    with pytest.raises(SafeParseError) as exc_info2:
+        safe_parse("x.real")
+    assert "Attribute access is strictly prohibited" in str(exc_info2.value)
+
+
+def test_safe_parse_rejects_unauthorized_identifiers_and_imports():
+    """Unapproved functions, module names, or imports must be rejected."""
+    with pytest.raises(SafeParseError):
+        safe_parse('os.system("echo hi")')
+
+    with pytest.raises(SafeParseError):
+        safe_parse('eval("1 + 1")')
+
+    with pytest.raises(SafeParseError):
+        safe_parse('import math')
+

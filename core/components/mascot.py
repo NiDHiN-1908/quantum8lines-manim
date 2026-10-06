@@ -104,35 +104,40 @@ class Mascot(VGroup):
 
     def place_corner(self, layout: Layout, corner: str = "bottom_right") -> "Mascot":
         """
-        Positions the mascot in a designated safe corner outside the stage region.
-        Guarantees that the mascot stays entirely within safe zone and never overlaps stage.
+        Positions the mascot in a designated safe corner outside the stage and caption regions.
+        Guarantees that the mascot stays entirely within safe zone and never overlaps stage or caption.
         """
+        # Ensure mascot height fits cleanly within corner safe vertical bands
+        max_height = 0.55
+        if self.height > max_height:
+            self.scale(max_height / self.height)
+
         is_portrait = layout.frame_height > layout.frame_width
 
         if is_portrait:
             # 9:16 layout
             if corner == "bottom_right":
-                target_pos = np.array([2.3, -2.7, 0.0])
+                target_pos = np.array([2.2, -3.22, 0.0])
             elif corner == "bottom_left":
-                target_pos = np.array([-2.3, -2.7, 0.0])
+                target_pos = np.array([-2.2, -3.22, 0.0])
             elif corner == "top_right":
-                target_pos = np.array([2.4, 4.4, 0.0])
+                target_pos = np.array([2.2, 4.4, 0.0])
             elif corner == "top_left":
-                target_pos = np.array([-2.4, 4.4, 0.0])
+                target_pos = np.array([-2.2, 4.4, 0.0])
             else:
-                target_pos = np.array([2.3, -2.7, 0.0])
+                target_pos = np.array([2.2, -3.22, 0.0])
         else:
             # 16:9 layout
             if corner == "bottom_right":
-                target_pos = np.array([5.0, -2.5, 0.0])
+                target_pos = np.array([5.0, -3.25, 0.0])
             elif corner == "bottom_left":
-                target_pos = np.array([-5.0, -2.5, 0.0])
+                target_pos = np.array([-5.0, -3.25, 0.0])
             elif corner == "top_right":
-                target_pos = np.array([5.0, 2.6, 0.0])
+                target_pos = np.array([5.2, 3.0, 0.0])
             elif corner == "top_left":
-                target_pos = np.array([-5.0, 2.6, 0.0])
+                target_pos = np.array([-5.2, 3.0, 0.0])
             else:
-                target_pos = np.array([5.0, -2.5, 0.0])
+                target_pos = np.array([5.0, -3.25, 0.0])
 
         self.move_to(target_pos)
         return self
