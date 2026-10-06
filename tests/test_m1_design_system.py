@@ -161,12 +161,20 @@ def _probe_stream(video_path: Path) -> dict:
 import json
 
 
-def test_conformed_outputs_exist_and_conform():
-    """Output files in build/ must exist with exact resolution and 30 fps."""
+def test_conformed_outputs_exist_and_conform(tmp_path):
+    """Output files generated into tmp_path must exist with exact resolution and 30 fps."""
+    intro_source = Path("brand/Quantum8Line_Intro.mp4")
+    if not intro_source.exists():
+        pytest.skip(f"Intro video not found at {intro_source}")
+
+    from pipeline.conform import conform_intro
+    conform_intro("169", input_path=intro_source, output_dir=tmp_path)
+    conform_intro("916", input_path=intro_source, output_dir=tmp_path)
+
     files_to_check = {
-        Path("build/intro_169.mp4"): {"width": 1920, "height": 1080, "fps": "30/1"},
-        Path("build/intro_916_candidate_a.mp4"): {"width": 1080, "height": 1920, "fps": "30/1"},
-        Path("build/intro_916_candidate_b.mp4"): {"width": 1080, "height": 1920, "fps": "30/1"},
+        tmp_path / "intro_169.mp4": {"width": 1920, "height": 1080, "fps": "30/1"},
+        tmp_path / "intro_916_candidate_a.mp4": {"width": 1080, "height": 1920, "fps": "30/1"},
+        tmp_path / "intro_916_candidate_b.mp4": {"width": 1080, "height": 1920, "fps": "30/1"},
     }
 
     for path, expected in files_to_check.items():
