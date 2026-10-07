@@ -36,7 +36,7 @@ This document describes the audio pipeline architecture, voice profiles, pronunc
                               v                    v
                    +----------------------+   +-----------------------+
                    | faster-whisper Align |   |  Audio FX & Loudnorm  |
-                   | (CUDA / CPU int8)    |   | (-14 LUFS, -1 dBTP)   |
+                   | (CUDA / CPU int8)    |   | (-14 LUFS, -1.5 dBTP) |
                    +----------+-----------+   +-----------+-----------+
                               |                           |
                               v                           v
@@ -60,7 +60,7 @@ The pipeline follows an audio-first design:
 1. **Engine Decoupling:** Scenes and scripts never interact directly with speech models. The `TTSEngine` interface (`pipeline/tts/base.py`) abstracts synthesis.
 2. **Lexicon Isolation:** Spoken phonetic substitutions apply strictly to synthesis audio, leaving caption text untouched.
 3. **Audio-Driven Animation:** Animation timing derives from absolute word timestamps emitted by forced alignment.
-4. **Broadcast Standard Audio:** Loudness is normalized to -14 LUFS integrated with true peak $\le -1$ dBTP.
+4. **Broadcast Standard Audio:** Loudness is normalized to -14 LUFS integrated with true peak target -1.5 dBTP (landing $\le -1.0$ dBTP).
 5. **Dynamic Captions:** Burned ASS subtitles provide word-by-word highlighted text in the `HIGHLIGHT` token color.
 
 ---
@@ -142,7 +142,7 @@ timings = build_narration(chapter_dir="topics/linear_algebra/ch01", profile_id="
 
 Per **SPEC Section 10**:
 - Integrated Loudness Target: **-14 LUFS integrated** ($\pm 1.0$ LU).
-- Maximum True Peak: **-1.0 dBTP** (never clipping).
+- Maximum True Peak: target **-1.5 dBTP** (so real exports land at or below **-1.0 dBTP**, never clipping).
 
 ### PostFX Filter Presets
 Defined in `pipeline/audio_fx.py` as transparent FFmpeg filter chains:
@@ -155,7 +155,8 @@ Defined in `pipeline/audio_fx.py` as transparent FFmpeg filter chains:
    - `acompressor`: Gentle, transparent compression (2.5:1 ratio, 20 ms attack, 150 ms release, -18 dB threshold) smoothing spoken dynamics without audible breathing or pumping artifacts.
 
 ### Two-Pass Loudness Normalization (`normalize`)
-- **Pass 1:** Analyzes audio with `loudnorm=I=-14:TP=-1.0:LRA=11:print_format=json`.
+- **Target:** -14 LUFS integrated ($\pm 1.0$ LU) and target True Peak **-1.5 dBTP** so exports reliably land at or below -1.0 dBTP.
+- **Pass 1:** Analyzes audio with `loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json`.
 - **Pass 2:** Applies linear normalization using measured `input_i`, `input_tp`, `input_lra`, `input_thresh`, and `target_offset`.
 - Automatically retains video streams (`-c:v copy`) when normalizing video files (e.g. intros).
 
@@ -166,10 +167,10 @@ When background music is added:
 - Mixed with `amix` and normalized to -14 LUFS.
 
 ### Conformed Intro Video Loudness Normalization
-All intro assets in `build/` are normalized to -14 LUFS:
-- `build/intro_169.mp4`: -33.09 LUFS $\to$ **-14.30 LUFS** (True Peak: -1.01 dBTP)
-- `build/intro_916_candidate_a.mp4`: -32.67 LUFS $\to$ **-13.88 LUFS** (True Peak: -0.97 dBTP)
-- `build/intro_916_candidate_b.mp4`: -33.59 LUFS $\to$ **-14.07 LUFS** (True Peak: -0.99 dBTP)
+All intro assets in `build/` are normalized to -14 LUFS with -1.5 dBTP target:
+- `build/intro_169.mp4`: -33.09 LUFS $\to$ **-14.18 LUFS** (True Peak: -1.47 dBTP)
+- `build/intro_916_candidate_a.mp4`: -32.67 LUFS $\to$ **-13.94 LUFS** (True Peak: -1.61 dBTP)
+- `build/intro_916_candidate_b.mp4`: -33.59 LUFS $\to$ **-14.09 LUFS** (True Peak: -1.56 dBTP)
 
 ---
 

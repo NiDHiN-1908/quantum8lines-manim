@@ -96,7 +96,7 @@ def normalize(
     path_in: Union[str, Path],
     path_out: Union[str, Path],
     target_i: float = -14.0,
-    target_tp: float = -1.0,
+    target_tp: float = -1.5,
     postfx: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
