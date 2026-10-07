@@ -249,12 +249,11 @@ def check_caption_text(
     script_words = re.sub(r"[^\w\s]", "", raw_script_text).lower().split()
 
     # 2. Extract caption words
-    if Path(captions_input).exists():
+    if isinstance(captions_input, (str, Path)) and Path(captions_input).exists():
         caption_content = Path(captions_input).read_text(encoding="utf-8")
     else:
         caption_content = str(captions_input)
 
-    # Strip ASS formatting tags {\...} and dialogue headers
     is_ass = "Dialogue:" in caption_content or "[Script Info]" in caption_content
     clean_lines = []
     for line in caption_content.splitlines():
@@ -263,49 +262,31 @@ def check_caption_text(
             parts = line.split(",", 9)
             if len(parts) == 10:
                 payload = parts[9]
-                clean_lines.append(re.sub(r"\{.*?\}", "", payload))
+                cleaned = re.sub(r"\{.*?\}", "", payload).strip()
+                # Deduplicate consecutive identical dialogue texts (from repeated karaoke chunk lines)
+                if not clean_lines or cleaned != clean_lines[-1]:
+                    clean_lines.append(cleaned)
         elif is_ass:
             continue
         elif "-->" in line or line.strip().isdigit() or not line.strip():
             # SRT line timing or counter
             continue
         elif not line.startswith("[") and not line.startswith("Format:") and not line.startswith("Style:"):
-            clean_lines.append(line)
+            clean_lines.append(line.strip())
 
     caption_text = " ".join(clean_lines)
     caption_words = re.sub(r"[^\w\s]", "", caption_text).lower().split()
 
-    # Deduplicate repeated words in consecutive chunk-highlight events
-    deduped_caption_words = []
-    # If it's an ASS with word-by-word duplicate frames, extract unique sequence
-    # Compare with script words directly using sequence matcher
-    matcher = difflib.SequenceMatcher(None, script_words, caption_words)
-    # Check if all script words are covered in order
-    script_joined = " ".join(script_words)
-    # For SRT or deduplicated words:
-    # A simple token-presence match:
-    unique_words_in_order = []
-    prev_w = None
-    for w in caption_words:
-        if w != prev_w:
-            unique_words_in_order.append(w)
-            prev_w = w
-
-    if script_words == unique_words_in_order or script_words == caption_words:
+    if script_words == caption_words:
         return True, "Caption text matches script words exactly."
 
-    # Compare set and sequence
     diff = list(difflib.unified_diff(
         script_words,
-        unique_words_in_order,
+        caption_words,
         fromfile="script",
         tofile="captions",
         lineterm=""
     ))
-
-    if not diff:
-        return True, "Caption text matches script words exactly."
-
     diff_str = "\n".join(diff)
     return False, f"Caption mismatch detected:\n{diff_str}"
 

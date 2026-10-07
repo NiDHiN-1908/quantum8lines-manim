@@ -6,6 +6,7 @@ Validates that clean fixtures pass all gates, and exactly 10 seeded failure mode
 from copy import deepcopy
 import json
 from pathlib import Path
+import shutil
 import pytest
 
 from pipeline.gates.g1_script import run_g1_script
@@ -40,8 +41,11 @@ def clean_chapter_data():
 # 1. Clean Fixture Verification
 # ============================================================================
 
-def test_clean_fixture_passes_all_gates(clean_chapter_data):
+def test_clean_fixture_passes_all_gates(tmp_path: Path, clean_chapter_data):
     """Verify that the clean chapter passes G1, G2, and G4 without any check failures."""
+    clean_copy = tmp_path / "clean_chapter"
+    shutil.copytree(CLEAN_FIXTURE_DIR, clean_copy)
+
     g1 = run_g1_script(
         script_data=clean_chapter_data["script"],
         facts_data=clean_chapter_data["facts"],
@@ -54,7 +58,7 @@ def test_clean_fixture_passes_all_gates(clean_chapter_data):
     assert all(c.passed for c in g2.checks)
 
     g4 = run_g4_code(
-        chapter_dir=CLEAN_FIXTURE_DIR,
+        chapter_dir=clean_copy,
         scene_source=clean_chapter_data["scene"],
     )
     assert g4.passed is True

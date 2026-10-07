@@ -8,6 +8,7 @@ and exactly 14 seeded failure modes trip their intended check IDs with informati
 from copy import deepcopy
 import json
 from pathlib import Path
+import shutil
 import pytest
 import soundfile as sf
 import numpy as np
@@ -30,13 +31,17 @@ CLEAN_CHAPTER_DIR = Path("tests/fixtures/seeded_b/clean_chapter")
 # 1. Clean Fixture End-to-End Verification (Both Layouts)
 # ============================================================================
 
-def test_clean_fixture_passes_all_gates_both_layouts():
+def test_clean_fixture_passes_all_gates_both_layouts(tmp_path: Path):
     """
     Assert that the clean chapter fixture passes G1 through G7 end-to-end
     on both 16:9 and 9:16 layouts via the gate runner.
+    Operates on an isolated copy in tmp_path to preserve fixture cleanliness.
     """
+    clean_copy = tmp_path / "clean_chapter"
+    shutil.copytree(CLEAN_CHAPTER_DIR, clean_copy)
+
     passed, gate_results = run_pipeline_gates(
-        chapter_dir=CLEAN_CHAPTER_DIR,
+        chapter_dir=clean_copy,
         layout="both",
     )
     assert passed is True, f"Gate runner failed on clean fixture: {[gr.gate_id for gr in gate_results if not gr.passed]}"
@@ -58,13 +63,13 @@ def test_clean_fixture_passes_all_gates_both_layouts():
                 assert c.passed is True, f"Check {c.id} failed: {c.message}"
 
     # Verify status.json records G3 and G8 as needs_human
-    status_data = load_status(CLEAN_CHAPTER_DIR)
+    status_data = load_status(clean_copy)
     assert status_data["gates"]["G3"] == "needs_human"
     assert status_data["gates"]["G8"] == "needs_human"
     assert status_data["stages"]["review"]["status"] == "needs_human"
 
     # Verify qa/report.json exists and reports overall passed
-    report = load_qa_report(CLEAN_CHAPTER_DIR)
+    report = load_qa_report(clean_copy)
     assert report is not None
     assert report["passed"] is True
 
@@ -599,3 +604,219 @@ class AllowedDigitsScene(BaseScene):
     assert g4g_check.passed is True
     assert g4g_check.severity == "warning"
     assert "benchmark reference point" in g4g_check.message
+
+
+# ============================================================================
+# 16. G7c Strictness Tests (100-word Caption)
+# ============================================================================
+
+def test_g7c_strictness_100_words(tmp_path):
+    """
+    Verify G7c caption text matching is strictly word-for-word on a ~100-word text:
+    - exact match passes
+    - changing ONE word fails
+    - dropping ONE word fails
+    - adding ONE word fails
+    """
+    clean_audio_path = CLEAN_CHAPTER_DIR / "audio" / "narration.wav"
+
+    words_100 = [
+        "quantum", "mechanics", "reveals", "that", "physical", "systems", "evolve",
+        "according", "to", "linear", "transformations", "in", "complex", "vector",
+        "spaces", "where", "every", "observable", "corresponds", "directly", "to",
+        "a", "hermitian", "operator", "whose", "eigenvalues", "represent", "all",
+        "possible", "measurement", "outcomes", "that", "an", "experimenter", "can",
+        "ever", "obtain", "under", "ideal", "laboratory", "conditions", "furthermore",
+        "the", "state", "vector", "remains", "unbroken", "until", "an", "interaction",
+        "occurs", "collapsing", "the", "superposition", "into", "a", "definite",
+        "basis", "state", "with", "probabilities", "governed", "strictly", "by",
+        "the", "born", "rule", "this", "fundamental", "geometric", "duality",
+        "connects", "abstract", "algebraic", "structures", "with", "tangible",
+        "empirical", "observations", "illuminating", "the", "underlying", "architecture",
+        "of", "our", "universe", "in", "astonishing", "clarity", "and", "depth",
+        "leaving", "no", "room", "for", "ambiguity", "or", "error", "here", "today"
+    ]
+    assert len(words_100) == 100
+    full_text = " ".join(words_100)
+
+    script_data = {
+        "chapter": "ch_strict",
+        "lines": [{"id": "l01", "text": full_text}]
+    }
+
+    def make_ass(text):
+        return (
+            "[Script Info]\nScriptType: v4.00+\n\n"
+            "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+            f"Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,{text}\n"
+        )
+
+    # 1. Exact match passes
+    p_exact = tmp_path / "exact.ass"
+    p_exact.write_text(make_ass(full_text), encoding="utf-8")
+    g7_exact = run_g7_audio(chapter_dir=tmp_path, audio_path=clean_audio_path, captions_path=p_exact, script_data=script_data)
+    c_exact = next(c for c in g7_exact.checks if c.id == "G7c_caption_text")
+    assert c_exact.passed is True
+
+    # 2. Changing ONE word fails
+    words_changed = list(words_100)
+    words_changed[42] = "modifiedword"
+    p_changed = tmp_path / "changed.ass"
+    p_changed.write_text(make_ass(" ".join(words_changed)), encoding="utf-8")
+    g7_changed = run_g7_audio(chapter_dir=tmp_path, audio_path=clean_audio_path, captions_path=p_changed, script_data=script_data)
+    c_changed = next(c for c in g7_changed.checks if c.id == "G7c_caption_text")
+    assert c_changed.passed is False
+    assert "mismatch" in c_changed.message.lower()
+
+    # 3. Dropping ONE word fails
+    words_dropped = list(words_100)
+    words_dropped.pop(50)
+    p_dropped = tmp_path / "dropped.ass"
+    p_dropped.write_text(make_ass(" ".join(words_dropped)), encoding="utf-8")
+    g7_dropped = run_g7_audio(chapter_dir=tmp_path, audio_path=clean_audio_path, captions_path=p_dropped, script_data=script_data)
+    c_dropped = next(c for c in g7_dropped.checks if c.id == "G7c_caption_text")
+    assert c_dropped.passed is False
+    assert "mismatch" in c_dropped.message.lower()
+
+    # 4. Adding ONE word fails
+    words_added = list(words_100)
+    words_added.insert(25, "extraword")
+    p_added = tmp_path / "added.ass"
+    p_added.write_text(make_ass(" ".join(words_added)), encoding="utf-8")
+    g7_added = run_g7_audio(chapter_dir=tmp_path, audio_path=clean_audio_path, captions_path=p_added, script_data=script_data)
+    c_added = next(c for c in g7_added.checks if c.id == "G7c_caption_text")
+    assert c_added.passed is False
+    assert "mismatch" in c_added.message.lower()
+
+
+# ============================================================================
+# 17. G6c Minimum Text Size Boundary Tests
+# ============================================================================
+
+def test_g6c_min_text_size_boundary(tmp_path):
+    """
+    Verify G6c text size boundaries:
+    - Text label at exactly 48.0 px passes G6c
+    - Text label at 90% of 48.0 px (43.2 px) fails G6c
+    - Key text at exactly 72.0 px passes G6c
+    - Key text at 90% of 72.0 px (64.8 px) fails G6c
+    """
+    storyboard = {"chapter": "ch01", "beats": [{"id": "b01"}]}
+
+    # 1. Label at exactly 48.0 px passes
+    snap_label_48 = [{
+        "beat_id": "b01",
+        "label": "b01",
+        "mobjects": {
+            "lbl": {"name": "lbl", "kind": "text", "essential": True, "key": False, "bbox": [0, 0, 1, 0.355], "height_px": 48.0, "color": "#f4f4f6"}
+        }
+    }]
+    g6_pass = run_g6_visual(chapter_dir=tmp_path, layout="16:9", snapshots=snap_label_48, storyboard_data=storyboard)
+    c_pass = next(c for c in g6_pass.checks if c.id == "G6c_min_text_size")
+    assert c_pass.passed is True
+
+    # 2. Label at 90% of 48 px (43.2 px) fails
+    snap_label_43 = [{
+        "beat_id": "b01",
+        "label": "b01",
+        "mobjects": {
+            "lbl": {"name": "lbl", "kind": "text", "essential": True, "key": False, "bbox": [0, 0, 1, 0.32], "height_px": 48.0 * 0.9, "color": "#f4f4f6"}
+        }
+    }]
+    g6_fail = run_g6_visual(chapter_dir=tmp_path, layout="16:9", snapshots=snap_label_43, storyboard_data=storyboard)
+    c_fail = next(c for c in g6_fail.checks if c.id == "G6c_min_text_size")
+    assert c_fail.passed is False
+    assert "below required" in c_fail.message.lower()
+
+    # 3. Key text at exactly 72.0 px passes
+    snap_key_72 = [{
+        "beat_id": "b01",
+        "label": "b01",
+        "mobjects": {
+            "key_txt": {"name": "key_txt", "kind": "text", "essential": True, "key": True, "bbox": [0, 0, 1, 0.533], "height_px": 72.0, "color": "#f4f4f6"}
+        }
+    }]
+    g6_key_pass = run_g6_visual(chapter_dir=tmp_path, layout="16:9", snapshots=snap_key_72, storyboard_data=storyboard)
+    c_key_pass = next(c for c in g6_key_pass.checks if c.id == "G6c_min_text_size")
+    assert c_key_pass.passed is True
+
+    # 4. Key text at 90% of 72 px (64.8 px) fails
+    snap_key_64 = [{
+        "beat_id": "b01",
+        "label": "b01",
+        "mobjects": {
+            "key_txt": {"name": "key_txt", "kind": "text", "essential": True, "key": True, "bbox": [0, 0, 1, 0.48], "height_px": 72.0 * 0.9, "color": "#f4f4f6"}
+        }
+    }]
+    g6_key_fail = run_g6_visual(chapter_dir=tmp_path, layout="16:9", snapshots=snap_key_64, storyboard_data=storyboard)
+    c_key_fail = next(c for c in g6_key_fail.checks if c.id == "G6c_min_text_size")
+    assert c_key_fail.passed is False
+    assert "below required" in c_key_fail.message.lower()
+
+
+# ============================================================================
+# 18. G4g Digits-in-Text Advanced Rules (f-string, facts.latex, Figure 1)
+# ============================================================================
+
+def test_g4g_fstring_and_facts_latex_pass(tmp_path):
+    """
+    Verify G4g:
+    - An f-string built from verified facts passes
+    - MathTex(facts.latex(...)) passes
+    """
+    scene_code = """
+from manim import Text, MathTex, Scene
+from core.scene_base import BaseScene
+
+class VerifiedMathScene(BaseScene):
+    def construct(self):
+        val = self.facts.get("lambda_1")
+        lbl = Text(f"Eigenvalue is {val}")
+        eq = MathTex(self.facts.latex("matrix_A"))
+        self.add(lbl, eq)
+"""
+    g4 = run_g4_code(chapter_dir=tmp_path, scene_source=scene_code)
+    g4g_check = next((c for c in g4.checks if c.id == "G4g_digits_in_text"), None)
+    assert g4g_check is not None
+    assert g4g_check.passed is True
+    assert g4g_check.severity == "error"
+
+
+def test_g4g_figure_1_flagged_unless_allow_digits(tmp_path):
+    """
+    Verify G4g:
+    - Text('Figure 1') is flagged as an error
+    - Text('Figure 1') with '# q8l: allow-digits <reason>' passes with a warning
+    """
+    # 1. Unescaped Text("Figure 1") fails G4g
+    scene_bad = """
+from manim import Text, Scene
+from core.scene_base import BaseScene
+
+class FigureScene(BaseScene):
+    def construct(self):
+        fig = Text("Figure 1")
+        self.add(fig)
+"""
+    g4_bad = run_g4_code(chapter_dir=tmp_path, scene_source=scene_bad)
+    c_bad = next(c for c in g4_bad.checks if c.id == "G4g_digits_in_text")
+    assert c_bad.passed is False
+    assert c_bad.severity == "error"
+    assert "Figure 1" in c_bad.message
+
+    # 2. Text("Figure 1") with escape hatch passes with warning
+    scene_good = """
+from manim import Text, Scene
+from core.scene_base import BaseScene
+
+class FigureScene(BaseScene):
+    def construct(self):
+        fig = Text("Figure 1")  # q8l: allow-digits diagram label for textbook figure
+        self.add(fig)
+"""
+    g4_good = run_g4_code(chapter_dir=tmp_path, scene_source=scene_good)
+    c_good = next(c for c in g4_good.checks if c.id == "G4g_digits_in_text")
+    assert c_good.passed is True
+    assert c_good.severity == "warning"
+    assert "diagram label for textbook figure" in c_good.message
+

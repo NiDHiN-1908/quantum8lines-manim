@@ -20,3 +20,10 @@ models/
 # OS
 .DS_Store
 Thumbs.db
+
+# Test fixture generated artifacts
+tests/fixtures/**/qa/
+tests/fixtures/**/status.json
+tests/fixtures/**/report.json
+tests/fixtures/**/snapshots_*.json
+tests/fixtures/**/renders/

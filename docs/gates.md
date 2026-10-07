@@ -181,13 +181,10 @@ Deterministic visual inspection evaluated from recorded beat snapshots per layou
 | `G6e_expect_visible` | Verifies every item in each storyboard beat's `expect.visible` exists in that beat's snapshots and lies inside the frame. | Expected storyboard object missing or out of view. |
 | `G6f_characters` | Verifies character mobjects do not intersect essential objects, and at most 2 characters appear in any snapshot. | Character covers essential math, or >2 characters on screen. |
 
-#### Text Height Pixel Conversion (SPEC 4.3)
-In Quantum8Lines, Manim coordinate units map deterministically to pixels based on the canonical 1080p canvas:
-- 16:9 canvas: 1080 px / 8.0 units = **135.0 px/unit**.
-- 9:16 canvas: 1920 px / (128/9 units) = **135.0 px/unit**.
-Rendered text height in pixels is calculated as:
-$$\text{height\_px} = \text{mob.height} \times 135.0$$
-Labels require $\ge 48\text{ px}$ ($\ge 0.356\text{ units}$); key words require $\ge 72\text{ px}$ ($\ge 0.533\text{ units}$).
+#### Text Height Pixel Conversion (G6c / SPEC 4.3)
+1. Canvas scale: Coordinate units map to pixels via `px_per_unit = 1080 / 8.0 = 135.0 px/unit`, matching LayoutTestScene and captions.
+2. Pixel height formula: Rendered height is measured as `height_px = mobject.height * 135.0` (recorded in snapshots).
+3. Minimum thresholds: Standard labels require `height_px >= 48.0 px` (0.356 units); key words require `height_px >= 72.0 px` (0.533 units).
 
 ---
 
