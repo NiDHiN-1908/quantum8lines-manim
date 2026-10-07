@@ -100,6 +100,14 @@ Executed after the scene coder produces `scene.py`. Parses Python Abstract Synta
 | `G4d_forbidden_names` | **Execution Security & Sandbox** | Rejects forbidden names: `eval`, `exec`, `open`, `__import__`, `compile`, `subprocess`, `os`, `sys`. Rejects attribute access starting with `__` (e.g. `__class__`, `__dict__`). |
 | `G4e_basescene_subclass` | **BaseScene Architecture** | Requires defining at least one class that subclasses `BaseScene`. |
 | `G4f_dry_run_construct` | **Dual-Layout Dry Run** | Compiles and executes `scene.construct()` in memory (`config.dry_run = True`) in both 16:9 (`LAYOUT_169`) and 9:16 (`LAYOUT_916`) aspect ratios without raising exceptions. |
+| `G4g_digits_in_text` | **Digits in Text & Labels** | String literals containing digits passed directly to `Text`, `MathTex`, `Tex`, `EquationLine`, `Callout`, or a `label` argument are forbidden; numbers shown on screen must come from `Facts.latex(...)` or an f-string using verified facts. An explicit escape hatch `# q8l: allow-digits <reason>` on that line passes with severity `"warning"` and lists the reason for G3 human review. |
+
+#### G4g Escape Hatch
+When mathematical constants or labels legitimately require digit literals that are not tracked in `facts.json` (such as fixed axis labels or formatting), authors may append a trailing comment on the same line:
+```python
+label = Text("Step 1")  # q8l: allow-digits chapter progression marker
+```
+When this comment is detected, `G4g_digits_in_text` passes with severity `"warning"` rather than failing with `"error"`, recording the reason in `qa/report.json` so G3 human review can inspect and approve it.
 
 #### Extension Point for M2.2
 `g4_code.py` contains a documented extension point `check_character_roster_extension(tree, roster_path)` designed to validate character IDs, poses, and slot assignments against `characters/roster.json` once character rigs are introduced in M2.2.

@@ -115,15 +115,60 @@ HEX_COLOR_REGEX = re.compile(
 
 
 class SceneASTVisitor(ast.NodeVisitor):
-    """AST Visitor checking rules G4a through G4e."""
+    """AST Visitor checking rules G4a through G4e and G4g."""
 
-    def __init__(self):
+    def __init__(self, source_lines: Optional[List[str]] = None):
+        self.source_lines: List[str] = source_lines or []
         self.numeric_errors: List[str] = []
         self.color_errors: List[str] = []
         self.import_errors: List[str] = []
         self.forbidden_name_errors: List[str] = []
         self.basescene_subclasses: List[str] = []
         self.handled_constants: Set[int] = set()
+        self.digits_errors: List[str] = []
+        self.digits_warnings: List[str] = []
+
+    def visit_Call(self, node: ast.Call):
+        # Rule g: G4g_digits_in_text
+        func_name = None
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+
+        TARGET_CALLS = {"Text", "MathTex", "Tex", "EquationLine", "Callout"}
+        ESCAPE_HATCH_RE = re.compile(r"#\s*q8l:\s*allow-digits\s*(.*)$")
+
+        check_args = []
+        if func_name in TARGET_CALLS:
+            check_args.extend(node.args)
+
+        for kw in node.keywords:
+            if func_name in TARGET_CALLS or kw.arg == "label":
+                check_args.append(kw.value)
+
+        for arg in check_args:
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                if re.search(r"\d", arg.value):
+                    line_idx = arg.lineno - 1
+                    line_text = (
+                        self.source_lines[line_idx]
+                        if 0 <= line_idx < len(self.source_lines)
+                        else ""
+                    )
+                    m = ESCAPE_HATCH_RE.search(line_text)
+                    if m:
+                        reason = m.group(1).strip()
+                        self.digits_warnings.append(
+                            f"Line {arg.lineno}: Allowed digits in '{arg.value}' with reason: {reason}"
+                        )
+                    else:
+                        self.digits_errors.append(
+                            f"Line {arg.lineno}: String literal containing digit '{arg.value}' passed to {func_name or 'label'}. "
+                            "Numbers must come from Facts.latex(...) or verified facts. Use '# q8l: allow-digits <reason>' to override."
+                        )
+
+        self.generic_visit(node)
 
     def visit_UnaryOp(self, node: ast.UnaryOp):
         # Handle signed constants like -1, +1, -2.7
@@ -292,7 +337,7 @@ def run_g4_code(
         return GateResult.create("G4", checks)
 
     # 3. Visit AST nodes
-    visitor = SceneASTVisitor()
+    visitor = SceneASTVisitor(source_lines=scene_source.splitlines())
     visitor.visit(tree)
 
     # Rule a: G4a_numeric_literals
@@ -371,6 +416,42 @@ def run_g4_code(
         )
     )
 
+    # Rule g: G4g_digits_in_text
+    digits_passed = len(visitor.digits_errors) == 0
+    if digits_passed:
+        if visitor.digits_warnings:
+            checks.append(
+                Check(
+                    id="G4g_digits_in_text",
+                    passed=True,
+                    severity="warning",
+                    message=f"Digits allowed via escape hatch: {'; '.join(visitor.digits_warnings)}",
+                    details={"warnings": visitor.digits_warnings},
+                )
+            )
+        else:
+            checks.append(
+                Check(
+                    id="G4g_digits_in_text",
+                    passed=True,
+                    severity="error",
+                    message="No hard-coded digit literals in text/labels; all numbers properly sourced.",
+                )
+            )
+    else:
+        checks.append(
+            Check(
+                id="G4g_digits_in_text",
+                passed=False,
+                severity="error",
+                message=f"Hard-coded digits in text/labels found: {'; '.join(visitor.digits_errors[:3])}",
+                details={
+                    "errors": visitor.digits_errors,
+                    "warnings": visitor.digits_warnings,
+                },
+            )
+        )
+
     # Extension point checks
     roster_path = (
         Path(chapter_dir).parents[1] / "characters" / "roster.json"
@@ -380,7 +461,7 @@ def run_g4_code(
     checks.extend(check_character_roster_extension(tree, roster_path))
 
     # Rule f: G4f_dry_run_construct
-    # Only execute code if lint rules a-e pass
+    # Only execute code if lint rules a-e and g pass
     lint_passed = all(
         c.passed
         for c in checks
@@ -391,6 +472,7 @@ def run_g4_code(
             "G4c_imports",
             "G4d_forbidden_names",
             "G4e_basescene_subclass",
+            "G4g_digits_in_text",
         )
     )
 

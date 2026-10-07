@@ -360,3 +360,59 @@ def test_safe_parse_rejects_unauthorized_identifiers_and_imports():
     with pytest.raises(SafeParseError):
         safe_parse('import math')
 
+
+# ---------------------------------------------------------------------------
+# 11. Facts.latex Tests (Milestone M4b Step 5)
+# ---------------------------------------------------------------------------
+
+def test_facts_latex():
+    facts = Facts()
+    facts.add_claim({
+        "id": "c_val",
+        "type": "value_at",
+        "expression": "x**2",
+        "variable": "x",
+        "at": 2,
+        "value": "1/2",
+        "status": "verified"
+    })
+    facts.add_claim({
+        "id": "c_mat",
+        "type": "eigenpair",
+        "matrix": [[2, 1], [0, 3]],
+        "vector": [1, 1],
+        "eigenvalue": 3,
+        "status": "verified"
+    })
+    facts.add_claim({
+        "id": "c_unverified",
+        "type": "derivative",
+        "expression": "x**3",
+        "derivative": "3*x**2",
+        "status": "unverifiable"
+    })
+
+    # Test exact value / expression
+    latex_val = facts.latex("c_val")
+    assert "\\frac{1}{2}" in latex_val
+
+    # Test matrix
+    latex_mat = facts.latex("c_mat.matrix")
+    assert "\\begin{matrix}" in latex_mat
+    assert "2 & 1" in latex_mat
+
+    # Test vector
+    latex_vec = facts.latex("c_mat.vector")
+    assert "\\begin{matrix}" in latex_vec
+
+    # Test dot notation attribute
+    assert facts.latex("c_mat.eigenvalue") == "3"
+
+    # Test unverified claim raises UnverifiedClaimError
+    with pytest.raises(UnverifiedClaimError):
+        facts.latex("c_unverified")
+
+    # Test non-existent key raises KeyError
+    with pytest.raises(KeyError):
+        facts.latex("non_existent_key")
+

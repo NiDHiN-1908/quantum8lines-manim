@@ -1,0 +1,46 @@
+[
+  {
+    "beat_id": "b01",
+    "sub_index": 0,
+    "label": "b01_0",
+    "timestamp": 1.0,
+    "mobjects": {
+      "dot_v": {
+        "name": "dot_v",
+        "kind": "object",
+        "essential": true,
+        "group": null,
+        "key": false,
+        "bbox": [
+          -0.08,
+          -0.08,
+          0.08,
+          0.08
+        ],
+        "color": "#58C4DD"
+      }
+    }
+  },
+  {
+    "beat_id": "b01",
+    "sub_index": null,
+    "label": "b01",
+    "timestamp": 1.0,
+    "mobjects": {
+      "dot_v": {
+        "name": "dot_v",
+        "kind": "object",
+        "essential": true,
+        "group": null,
+        "key": false,
+        "bbox": [
+          -0.08,
+          -0.08,
+          0.08,
+          0.08
+        ],
+        "color": "#58C4DD"
+      }
+    }
+  }
+]
