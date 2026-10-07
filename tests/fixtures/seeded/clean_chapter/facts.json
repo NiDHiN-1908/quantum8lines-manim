@@ -1,0 +1,16 @@
+{
+  "claims": [
+    {
+      "id": "c1",
+      "type": "eigenpair",
+      "matrix": [[2, 0], [0, 3]],
+      "vector": [1, 0],
+      "value": 2,
+      "status": "verified"
+    }
+  ],
+  "values": {
+    "A": [[2, 0], [0, 3]],
+    "eigvals": [2, 3]
+  }
+}

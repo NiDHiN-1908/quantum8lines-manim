@@ -1,0 +1,36 @@
+{
+  "chapter": "ch_clean",
+  "lines": [
+    {
+      "id": "l01",
+      "text": "What if a matrix could transform space while keeping certain special directions completely unchanged? This is the central question of linear algebra.",
+      "beat": "hook",
+      "cut": "both",
+      "claims": ["c1"]
+    },
+    {
+      "id": "l02",
+      "text": "Imagine applying a transformation to every vector in the coordinate plane. Most vectors will rotate and stretch away from their initial orientation.",
+      "beat": "setup",
+      "cut": "both"
+    },
+    {
+      "id": "l03",
+      "text": "However, along special lines through the origin, vectors only get scaled by a numerical factor rather than knocked off their span.",
+      "beat": "build",
+      "cut": "both"
+    },
+    {
+      "id": "l04",
+      "text": "This scaling factor is the eigenvalue, and the span that preserves direction is the eigenspace. Everything falls into place naturally.",
+      "beat": "aha",
+      "cut": "both"
+    },
+    {
+      "id": "l05",
+      "text": "Mastering these invariant directions unlocks quantum mechanics, data science, and vibrational physics. Join us as we explore the geometric landscape.",
+      "beat": "close",
+      "cut": "both"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "chapter": "ch_clean",
+  "beats": [
+    {
+      "id": "b01",
+      "line_ids": ["l01"],
+      "regions": {"stage": "center"},
+      "expect": {"visible": ["dot_v"], "text": "vector stays on its line"}
+    },
+    {
+      "id": "b02",
+      "line_ids": ["l02", "l03", "l04", "l05"],
+      "regions": {"stage": "center"},
+      "expect": {"visible": ["dot_v"]}
+    }
+  ]
+}

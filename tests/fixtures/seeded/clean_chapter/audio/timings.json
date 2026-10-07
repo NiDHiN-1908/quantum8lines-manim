@@ -1,0 +1,53 @@
+{
+  "chapter": "ch_clean",
+  "profile_id": "calm_curious_heart",
+  "sample_rate": 24000,
+  "total_duration": 4.0,
+  "lines": [
+    {
+      "id": "l01",
+      "beat": "hook",
+      "text": "What if a matrix...",
+      "start": 0.0,
+      "end": 1.0,
+      "duration": 1.0,
+      "pause_after": 0.0
+    },
+    {
+      "id": "l02",
+      "beat": "setup",
+      "text": "Imagine applying...",
+      "start": 1.0,
+      "end": 2.0,
+      "duration": 1.0,
+      "pause_after": 0.0
+    },
+    {
+      "id": "l03",
+      "beat": "build",
+      "text": "However, along special...",
+      "start": 2.0,
+      "end": 3.0,
+      "duration": 1.0,
+      "pause_after": 0.0
+    },
+    {
+      "id": "l04",
+      "beat": "aha",
+      "text": "This scaling factor...",
+      "start": 3.0,
+      "end": 3.5,
+      "duration": 0.5,
+      "pause_after": 0.0
+    },
+    {
+      "id": "l05",
+      "beat": "close",
+      "text": "Mastering these invariant...",
+      "start": 3.5,
+      "end": 4.0,
+      "duration": 0.5,
+      "pause_after": 0.0
+    }
+  ]
+}
