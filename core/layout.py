@@ -85,6 +85,10 @@ class Layout:
     regions: Dict[str, Region]
 
     @property
+    def slug(self) -> str:
+        return "169" if self.name in ("16:9", "169") else "916"
+
+    @property
     def px_per_unit(self) -> float:
         return self.pixel_height / self.frame_height
 

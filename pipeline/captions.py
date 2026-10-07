@@ -255,6 +255,7 @@ def check_caption_text(
         caption_content = str(captions_input)
 
     # Strip ASS formatting tags {\...} and dialogue headers
+    is_ass = "Dialogue:" in caption_content or "[Script Info]" in caption_content
     clean_lines = []
     for line in caption_content.splitlines():
         if line.startswith("Dialogue:"):
@@ -263,6 +264,8 @@ def check_caption_text(
             if len(parts) == 10:
                 payload = parts[9]
                 clean_lines.append(re.sub(r"\{.*?\}", "", payload))
+        elif is_ass:
+            continue
         elif "-->" in line or line.strip().isdigit() or not line.strip():
             # SRT line timing or counter
             continue

@@ -1,0 +1,40 @@
+{
+  "chapter": "ch_clean",
+  "beats": [
+    {
+      "id": "b01",
+      "line_ids": ["l01"],
+      "expect": {
+        "visible": ["title_text"]
+      }
+    },
+    {
+      "id": "b02",
+      "line_ids": ["l02"],
+      "expect": {
+        "visible": ["title_text"]
+      }
+    },
+    {
+      "id": "b03",
+      "line_ids": ["l03"],
+      "expect": {
+        "visible": ["title_text"]
+      }
+    },
+    {
+      "id": "b04",
+      "line_ids": ["l04"],
+      "expect": {
+        "visible": ["title_text"]
+      }
+    },
+    {
+      "id": "b05",
+      "line_ids": ["l05"],
+      "expect": {
+        "visible": ["title_text"]
+      }
+    }
+  ]
+}

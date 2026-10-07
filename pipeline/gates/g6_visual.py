@@ -92,6 +92,7 @@ def run_g6_visual(
     storyboard_data: Optional[Dict[str, Any]] = None,
     layout: Union[str, Layout] = "16:9",
     config: Optional[GateConfig] = None,
+    gate_id: Optional[str] = None,
 ) -> GateResult:
     """
     Execute Quality Gate G6: Visual QA from recorded snapshots for a specific layout.
@@ -426,4 +427,4 @@ def run_g6_visual(
         )
     )
 
-    return GateResult.create(f"G6_{slug}", checks)
+    return GateResult.create(gate_id or f"G6_{slug}", checks)

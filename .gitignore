@@ -12,6 +12,7 @@ __pycache__/
 build/
 media/
 temp_renders/
+renders/
 
 # Local models
 models/

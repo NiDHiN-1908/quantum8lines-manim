@@ -1,0 +1,399 @@
+{
+  "passed": true,
+  "timestamp": "2026-10-07T08:05:46.587650+00:00",
+  "gates": {
+    "G1": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G1_schema",
+          "passed": true,
+          "severity": "error",
+          "message": "Script schema is valid.",
+          "details": null
+        },
+        {
+          "id": "G1_line_ids_unique",
+          "passed": true,
+          "severity": "error",
+          "message": "All line IDs are unique.",
+          "details": null
+        },
+        {
+          "id": "G1_beat_names",
+          "passed": true,
+          "severity": "error",
+          "message": "All beat names are valid.",
+          "details": null
+        },
+        {
+          "id": "G1_cut_tags",
+          "passed": true,
+          "severity": "error",
+          "message": "All cut tags are valid.",
+          "details": null
+        },
+        {
+          "id": "G1_word_count",
+          "passed": true,
+          "severity": "error",
+          "message": "Word count 106 is within allowed range [100, 180].",
+          "details": {
+            "total_words": 106,
+            "min_words": 100,
+            "max_words": 180
+          }
+        },
+        {
+          "id": "G1_beat_order",
+          "passed": true,
+          "severity": "error",
+          "message": "Beats appear in canonical order.",
+          "details": null
+        },
+        {
+          "id": "G1_claim_ids_exist",
+          "passed": true,
+          "severity": "error",
+          "message": "All referenced claim IDs exist in facts.json.",
+          "details": null
+        }
+      ]
+    },
+    "G2": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G2_schema",
+          "passed": true,
+          "severity": "error",
+          "message": "Facts schema is valid.",
+          "details": null
+        },
+        {
+          "id": "G2_all_verified",
+          "passed": true,
+          "severity": "error",
+          "message": "All 1 claims verified.",
+          "details": null
+        }
+      ]
+    },
+    "G4": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G4a_numeric_literals",
+          "passed": true,
+          "severity": "error",
+          "message": "Numeric literals adhere to allowed set {0, 1, -1}.",
+          "details": null
+        },
+        {
+          "id": "G4b_no_raw_colors",
+          "passed": true,
+          "severity": "error",
+          "message": "No raw colors found; tokens used consistently.",
+          "details": null
+        },
+        {
+          "id": "G4c_imports",
+          "passed": true,
+          "severity": "error",
+          "message": "All imports are restricted to manim, math, and core.*.",
+          "details": null
+        },
+        {
+          "id": "G4d_forbidden_names",
+          "passed": true,
+          "severity": "error",
+          "message": "No forbidden functions or dunder attributes used.",
+          "details": null
+        },
+        {
+          "id": "G4e_basescene_subclass",
+          "passed": true,
+          "severity": "error",
+          "message": "Defines BaseScene subclass: ['CleanScene'].",
+          "details": {
+            "subclasses": [
+              "CleanScene"
+            ]
+          }
+        },
+        {
+          "id": "G4g_digits_in_text",
+          "passed": true,
+          "severity": "error",
+          "message": "No hard-coded digit literals in text/labels; all numbers properly sourced.",
+          "details": null
+        },
+        {
+          "id": "G4f_dry_run_construct",
+          "passed": true,
+          "severity": "error",
+          "message": "Scene constructed cleanly in both 16:9 and 9:16.",
+          "details": null
+        }
+      ]
+    },
+    "G5_169": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G5d_beat_overrun",
+          "passed": true,
+          "severity": "error",
+          "message": "No beat overruns detected during scene render.",
+          "details": null
+        },
+        {
+          "id": "G5a_render_succeeds",
+          "passed": true,
+          "severity": "error",
+          "message": "Render succeeded: video output at C:\\Users\\nidhi\\Desktop\\quantum8lines-manim\\tests\\fixtures\\seeded_b\\clean_chapter\\renders\\169\\scene_169.mp4",
+          "details": {
+            "video_path": "C:\\Users\\nidhi\\Desktop\\quantum8lines-manim\\tests\\fixtures\\seeded_b\\clean_chapter\\renders\\169\\scene_169.mp4",
+            "error": null
+          }
+        },
+        {
+          "id": "G5b_no_empty_frames",
+          "passed": true,
+          "severity": "error",
+          "message": "Frame emptiness check passed: 0/5 (0.0%) blank frames (<= 15% allowed).",
+          "details": {
+            "total_frames": 5,
+            "blank_count": 0,
+            "blank_fraction": 0.0,
+            "threshold_fraction": 0.15,
+            "pixel_diff_threshold": 0.002
+          }
+        },
+        {
+          "id": "G5c_duration_matches_audio",
+          "passed": true,
+          "severity": "error",
+          "message": "Video duration (2.33s) matches audio duration (2.50s) within 0.3s tolerance.",
+          "details": {
+            "video_duration": 2.333,
+            "audio_duration": 2.5,
+            "difference_sec": 0.167,
+            "tolerance_sec": 0.3
+          }
+        }
+      ]
+    },
+    "G6_169": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G6a_inside_safe",
+          "passed": true,
+          "severity": "error",
+          "message": "All essential and text objects are within 16:9 safe bounds.",
+          "details": {
+            "layout": "169"
+          }
+        },
+        {
+          "id": "G6b_no_overlap",
+          "passed": true,
+          "severity": "error",
+          "message": "No disallowed object overlaps detected in 16:9.",
+          "details": {
+            "layout": "169"
+          }
+        },
+        {
+          "id": "G6c_min_text_size",
+          "passed": true,
+          "severity": "error",
+          "message": "All text elements meet minimum size specifications (48px labels, 72px keywords).",
+          "details": {
+            "layout": "169"
+          }
+        },
+        {
+          "id": "G6d_contrast",
+          "passed": true,
+          "severity": "error",
+          "message": "All text elements meet WCAG contrast ratio threshold (>=4.5).",
+          "details": {
+            "layout": "169"
+          }
+        },
+        {
+          "id": "G6e_expect_visible",
+          "passed": true,
+          "severity": "error",
+          "message": "All expect.visible objects from storyboard are present on screen.",
+          "details": {
+            "layout": "169"
+          }
+        },
+        {
+          "id": "G6f_characters",
+          "passed": true,
+          "severity": "error",
+          "message": "Characters comply with screen count and do not cover essential objects.",
+          "details": {
+            "layout": "169"
+          }
+        }
+      ]
+    },
+    "G5_916": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G5d_beat_overrun",
+          "passed": true,
+          "severity": "error",
+          "message": "No beat overruns detected during scene render.",
+          "details": null
+        },
+        {
+          "id": "G5a_render_succeeds",
+          "passed": true,
+          "severity": "error",
+          "message": "Render succeeded: video output at C:\\Users\\nidhi\\Desktop\\quantum8lines-manim\\tests\\fixtures\\seeded_b\\clean_chapter\\renders\\916\\scene_916.mp4",
+          "details": {
+            "video_path": "C:\\Users\\nidhi\\Desktop\\quantum8lines-manim\\tests\\fixtures\\seeded_b\\clean_chapter\\renders\\916\\scene_916.mp4",
+            "error": null
+          }
+        },
+        {
+          "id": "G5b_no_empty_frames",
+          "passed": true,
+          "severity": "error",
+          "message": "Frame emptiness check passed: 0/5 (0.0%) blank frames (<= 15% allowed).",
+          "details": {
+            "total_frames": 5,
+            "blank_count": 0,
+            "blank_fraction": 0.0,
+            "threshold_fraction": 0.15,
+            "pixel_diff_threshold": 0.002
+          }
+        },
+        {
+          "id": "G5c_duration_matches_audio",
+          "passed": true,
+          "severity": "error",
+          "message": "Video duration (2.33s) matches audio duration (2.50s) within 0.3s tolerance.",
+          "details": {
+            "video_duration": 2.333,
+            "audio_duration": 2.5,
+            "difference_sec": 0.167,
+            "tolerance_sec": 0.3
+          }
+        }
+      ]
+    },
+    "G6_916": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G6a_inside_safe",
+          "passed": true,
+          "severity": "error",
+          "message": "All essential and text objects are within 9:16 safe bounds.",
+          "details": {
+            "layout": "916"
+          }
+        },
+        {
+          "id": "G6b_no_overlap",
+          "passed": true,
+          "severity": "error",
+          "message": "No disallowed object overlaps detected in 9:16.",
+          "details": {
+            "layout": "916"
+          }
+        },
+        {
+          "id": "G6c_min_text_size",
+          "passed": true,
+          "severity": "error",
+          "message": "All text elements meet minimum size specifications (48px labels, 72px keywords).",
+          "details": {
+            "layout": "916"
+          }
+        },
+        {
+          "id": "G6d_contrast",
+          "passed": true,
+          "severity": "error",
+          "message": "All text elements meet WCAG contrast ratio threshold (>=4.5).",
+          "details": {
+            "layout": "916"
+          }
+        },
+        {
+          "id": "G6e_expect_visible",
+          "passed": true,
+          "severity": "error",
+          "message": "All expect.visible objects from storyboard are present on screen.",
+          "details": {
+            "layout": "916"
+          }
+        },
+        {
+          "id": "G6f_characters",
+          "passed": true,
+          "severity": "error",
+          "message": "Characters comply with screen count and do not cover essential objects.",
+          "details": {
+            "layout": "916"
+          }
+        }
+      ]
+    },
+    "G7": {
+      "passed": true,
+      "checks": [
+        {
+          "id": "G7a_loudness",
+          "passed": true,
+          "severity": "error",
+          "message": "Audio loudness compliant: -13.95 LUFS (target -14 +/- 1 LU), true peak -10.27 dBTP (<= -1.0 dBTP).",
+          "details": {
+            "measured_lufs": -13.95,
+            "target_lufs": -14.0,
+            "measured_tp": -10.27,
+            "max_tp": -1.0
+          }
+        },
+        {
+          "id": "G7b_no_clipping",
+          "passed": true,
+          "severity": "error",
+          "message": "No clipping detected (peak sample: 0.3065 < 0.999).",
+          "details": {
+            "peak_sample": 0.3065,
+            "max_peak_allowed": 0.999,
+            "consecutive_runs": 0
+          }
+        },
+        {
+          "id": "G7c_caption_text",
+          "passed": true,
+          "severity": "error",
+          "message": "Caption text matches script words exactly.",
+          "details": {
+            "captions_path": "C:\\Users\\nidhi\\Desktop\\quantum8lines-manim\\tests\\fixtures\\seeded_b\\clean_chapter\\captions\\captions_169.ass"
+          }
+        },
+        {
+          "id": "G7d_caption_timing",
+          "passed": true,
+          "severity": "error",
+          "message": "All 5 caption timestamps are valid, chronological, and within audio bounds.",
+          "details": {
+            "interval_count": 5
+          }
+        }
+      ]
+    }
+  }
+}

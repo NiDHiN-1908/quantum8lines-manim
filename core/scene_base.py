@@ -135,6 +135,7 @@ class BaseScene(Scene):
         self.script_data: Optional[Dict[str, Any]] = script_data
         self.storyboard_data: Optional[Dict[str, Any]] = storyboard_data
         self.timings_data: Optional[Dict[str, Any]] = timings_data
+        self.facts: Any = None
         self.snapshots: List[BeatSnapshot] = []
         self._registered_mobjects: Dict[str, Dict[str, Any]] = {}
         self._active_beat_id: Optional[str] = None
@@ -146,9 +147,17 @@ class BaseScene(Scene):
             self._load_chapter_data()
 
     def _load_chapter_data(self) -> None:
-        """Load script.json, audio/timings.json, and storyboard.json from chapter_dir."""
+        """Load script.json, audio/timings.json, storyboard.json, and facts.json from chapter_dir."""
         if self.chapter_dir is None or not self.chapter_dir.exists():
             return
+
+        facts_file = self.chapter_dir / "facts.json"
+        if self.facts is None and facts_file.exists():
+            from core.mathengine.facts import Facts
+            try:
+                self.facts = Facts.load(facts_file)
+            except Exception:
+                pass
 
         script_file = self.chapter_dir / "script.json"
         if self.script_data is None and script_file.exists():
@@ -225,7 +234,8 @@ class BaseScene(Scene):
             return self.snapshots[-1]
 
         mobjects_info: Dict[str, Dict[str, Any]] = {}
-        px_per_unit = getattr(self.layout, "px_per_unit", 135.0)
+        # Standard pixel conversion per SPEC 4.3 and LayoutTestScene (1080p canvas = 135.0 px/unit)
+        px_per_unit = 135.0
 
         for name, item in self._registered_mobjects.items():
             mob = item["mob"]

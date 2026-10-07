@@ -1,0 +1,35 @@
+{
+  "total_duration": 2.5,
+  "lines": [
+    {
+      "id": "l01",
+      "start": 0.0,
+      "end": 0.5,
+      "text": "Welcome to our mathematical exploration of geometric transformations where we examine how fundamental coordinate systems behave under standard linear equations."
+    },
+    {
+      "id": "l02",
+      "start": 0.5,
+      "end": 1.0,
+      "text": "To establish our foundation we define the primary coordinate framework ensuring that each mathematical element remains fully consistent across all dimensional representations."
+    },
+    {
+      "id": "l03",
+      "start": 1.0,
+      "end": 1.5,
+      "text": "As we progressively construct our algebraic relationship observe how the verified values from our mathematical engine guide the visual trajectory directly forward."
+    },
+    {
+      "id": "l04",
+      "start": 1.5,
+      "end": 2.0,
+      "text": "Here is the key insight when zero is added to any variable the identity transformation preserves the original value completely unaltered."
+    },
+    {
+      "id": "l05",
+      "start": 2.0,
+      "end": 2.5,
+      "text": "This remarkable symmetry guarantees stability across every coordinate projection concluding our rigorous visual proof with complete precision and aesthetic mathematical harmony."
+    }
+  ]
+}

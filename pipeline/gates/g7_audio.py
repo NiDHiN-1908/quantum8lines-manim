@@ -156,8 +156,8 @@ def run_g7_audio(
     # -----------------------------------------------------------------------
     try:
         meas = measure_loudness(audio_file)
-        lufs = meas.get("input_i", -99.0)
-        tp = meas.get("input_tp", 0.0)
+        lufs = meas.get("integrated_lufs", meas.get("input_i", -99.0))
+        tp = meas.get("true_peak", meas.get("input_tp", 0.0))
 
         min_lufs = cfg.target_lufs - cfg.lufs_tolerance
         max_lufs = cfg.target_lufs + cfg.lufs_tolerance

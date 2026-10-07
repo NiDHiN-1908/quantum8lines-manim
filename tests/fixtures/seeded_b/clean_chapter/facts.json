@@ -1,0 +1,15 @@
+{
+  "chapter": "ch_clean",
+  "claims": [
+    {
+      "id": "c01",
+      "type": "equation_true",
+      "lhs": "x + 0",
+      "rhs": "x",
+      "status": "verified"
+    }
+  ],
+  "values": {
+    "c01": 0
+  }
+}

@@ -205,16 +205,16 @@ def test_inter_bold_ink_coverage():
         def construct(self):
             t_reg = Text("Quantum8Lines Math 2026", font=font_name, weight="NORMAL", font_size=48)
             lbl_reg = Text("Regular (NORMAL)", font=font_name, font_size=24, color="#71717a").next_to(t_reg, DOWN, buff=0.2)
-            group_reg = VGroup(t_reg, lbl_reg).shift([-3.2, 0, 0])
+            group_reg = VGroup(t_reg, lbl_reg).shift([-4.5, 0, 0])
 
             t_bold = Text("Quantum8Lines Math 2026", font=font_name, weight="BOLD", font_size=48)
             lbl_bold = Text("Bold (BOLD)", font=font_name, font_size=24, color="#71717a").next_to(t_bold, DOWN, buff=0.2)
-            group_bold = VGroup(t_bold, lbl_bold).shift([3.2, 0, 0])
+            group_bold = VGroup(t_bold, lbl_bold).shift([4.5, 0, 0])
 
             self.add(group_reg, group_bold)
 
     Path("temp_renders").mkdir(exist_ok=True)
-    with tempconfig({"pixel_width": 1920, "pixel_height": 600, "frame_width": 16, "frame_height": 5, "verbosity": "ERROR"}):
+    with tempconfig({"pixel_width": 1920, "pixel_height": 600, "frame_width": 20, "frame_height": 5, "verbosity": "ERROR"}):
         scene = FontCheckScene()
         scene.render()
         img = scene.camera.get_image()

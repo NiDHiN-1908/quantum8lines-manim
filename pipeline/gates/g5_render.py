@@ -156,6 +156,7 @@ def run_g5_render(
     layout: str = "16:9",
     quality: str = "test",
     config: Optional[GateConfig] = None,
+    gate_id: Optional[str] = None,
 ) -> GateResult:
     """
     Execute Quality Gate G5: Render Test on chapter.
@@ -222,7 +223,7 @@ def run_g5_render(
                 message="Skipped duration check because render failed.",
             )
         )
-        return GateResult.create("G5", checks)
+        return GateResult.create(gate_id or "G5", checks)
 
     # Check G5b_no_empty_frames
     no_empty_passed, empty_msg, empty_details = sample_frames_and_check_blank(
@@ -269,4 +270,4 @@ def run_g5_render(
             )
         )
 
-    return GateResult.create("G5", checks)
+    return GateResult.create(gate_id or "G5", checks)

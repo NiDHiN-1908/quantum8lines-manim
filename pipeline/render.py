@@ -160,15 +160,36 @@ def render_chapter(
             quality=quality,
         )
 
-    # 5. Configure Manim config
-    apply_layout(manim_config, render_layout)
-    manim_config.media_dir = str(output_dir / "_media")
-    manim_config.output_file = str(target_video_file)
-    manim_config.dry_run = False
-    manim_config.verbosity = "WARNING"
+    # 5. Configure Manim config with isolation
+    orig_config = {
+        "pixel_width": manim_config.pixel_width,
+        "pixel_height": manim_config.pixel_height,
+        "frame_width": manim_config.frame_width,
+        "frame_height": manim_config.frame_height,
+        "frame_rate": manim_config.frame_rate,
+        "media_dir": manim_config.media_dir,
+        "output_file": manim_config.output_file,
+        "dry_run": manim_config.dry_run,
+        "verbosity": manim_config.verbosity,
+        "write_to_movie": getattr(manim_config, "write_to_movie", True),
+    }
+
+    if target_video_file.exists():
+        try:
+            target_video_file.unlink()
+        except Exception:
+            pass
 
     # 6. Render scene instance
     try:
+        apply_layout(manim_config, render_layout)
+        manim_config.media_dir = str(output_dir / "_media")
+        manim_config.output_file = str(target_video_file)
+        manim_config.dry_run = False
+        manim_config.verbosity = "WARNING"
+        if hasattr(manim_config, "write_to_movie"):
+            manim_config.write_to_movie = True
+
         scene_inst = scene_cls(
             layout=render_layout,
             chapter_dir=ch_path,
@@ -191,6 +212,9 @@ def render_chapter(
             layout=slug,
             quality=quality,
         )
+    finally:
+        for k, v in orig_config.items():
+            setattr(manim_config, k, v)
 
     # 7. Locate output video file
     actual_file: Optional[Path] = None
@@ -204,6 +228,13 @@ def render_chapter(
                 actual_file = target_video_file
         except Exception:
             pass
+        if actual_file is None:
+            # Fallback search under media_dir
+            for cand in (output_dir / "_media").glob("**/*.mp4"):
+                if cand.is_file() and cand.stat().st_size > 0:
+                    shutil.copy(cand, target_video_file)
+                    actual_file = target_video_file
+                    break
 
     if actual_file is None or not actual_file.exists():
         return RenderResult(
