@@ -57,3 +57,24 @@ class GateConfig(BaseModel):
     allowed_cuts: List[str] = Field(
         default_factory=lambda: ["both", "short", "long"]
     )
+    # G5 Render Test Thresholds
+    empty_frame_sample_sec: float = 0.5
+    blank_pixel_diff_threshold: float = 0.002  # 0.2%
+    max_blank_frame_fraction: float = 0.15  # 15%
+    duration_match_tolerance_sec: float = 0.3  # 0.3 s
+
+    # G6 Visual Thresholds
+    visual_overlap_tolerance: float = 0.02  # Manim unit overlap tolerance
+    min_label_text_height_px: float = 48.0
+    min_keyword_text_height_px: float = 72.0
+    min_contrast_ratio: float = 4.5
+    max_character_count: int = 2
+
+    # G7 Audio Thresholds
+    target_lufs: float = -14.0
+    lufs_tolerance: float = 1.0  # +/- 1 LU
+    max_true_peak_dbtp: float = -1.0
+    max_peak_sample: float = 0.999
+    max_consecutive_full_scale: int = 3
+    caption_timing_tolerance_sec: float = 0.3
+

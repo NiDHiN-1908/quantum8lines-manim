@@ -1,15 +1,16 @@
 """
-Unit tests for Audio-First BaseScene (SPEC.md Section 10 & Milestone M4a).
-Tests padding arithmetic, BeatOverrunError on overrun, and registered snapshot tracking.
+Unit tests for Audio-First BaseScene (SPEC.md Section 10 & Milestone M4a / M4b).
+Tests padding arithmetic, BeatOverrunError on overrun, registered snapshot tracking,
+sub-index snapshots per play/wait, metadata (group, key, text, height_px), and qa/snapshots_<layout>.json export.
 """
 
 import json
 from pathlib import Path
 import pytest
-from manim import Dot, Circle, FadeIn, config, ORIGIN, RIGHT
+from manim import Dot, Circle, Text, FadeIn, config, ORIGIN, RIGHT
 
 from core.scene_base import BaseScene, BeatOverrunError, BeatSnapshot
-from core.tokens import PRIMARY, SECONDARY
+from core.tokens import PRIMARY, SECONDARY, TEXT
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +44,7 @@ def test_basescene_standalone_behavior():
 
 
 def test_beat_padding_arithmetic():
-    """Verify that if animations take less than the audio window, the beat is padded to the full duration."""
+    """Verify that if animations take less than the audio window, the beat is padded to the full duration and sub-snapshots are captured."""
     storyboard = {
         "chapter": "ch01",
         "beats": [
@@ -60,8 +61,9 @@ def test_beat_padding_arithmetic():
     class PaddedScene(BaseScene):
         def construct(self):
             with self.beat("b01"):
-                # Animation runs for 0.5s
+                # Animation runs for 0.5s -> triggers sub-snapshot 0
                 d = Dot()
+                self.register("dot", d, essential=True)
                 self.play(FadeIn(d), run_time=0.5)
 
     scene = PaddedScene(storyboard_data=storyboard, timings_data=timings)
@@ -69,9 +71,15 @@ def test_beat_padding_arithmetic():
 
     # The beat should be padded by 1.5s so total time is 2.0s
     assert abs(scene.time - 2.0) < 0.05
-    assert len(scene.snapshots) == 1
-    assert scene.snapshots[0].beat_id == "b01"
-    assert abs(scene.snapshots[0].timestamp - 2.0) < 0.05
+    # Two snapshots: sub-snapshot 0 (after play) and final end-of-beat snapshot
+    assert len(scene.snapshots) == 2
+    assert scene.snapshots[0].sub_index == 0
+    assert scene.snapshots[0].label == "b01_0"
+    assert abs(scene.snapshots[0].timestamp - 0.5) < 0.05
+
+    assert scene.snapshots[1].sub_index is None
+    assert scene.snapshots[1].label == "b01"
+    assert abs(scene.snapshots[1].timestamp - 2.0) < 0.05
 
 
 def test_beat_overrun_error_raised():
@@ -106,7 +114,7 @@ def test_beat_overrun_error_raised():
 
 
 def test_snapshots_bounding_box_and_metadata():
-    """Verify snapshot records bounding box [x_min, y_min, x_max, y_max], kind, essential flag, and color."""
+    """Verify snapshot records bounding box, group, key, and for text stores string and rendered height_px."""
     storyboard = {
         "chapter": "ch01",
         "beats": [
@@ -124,10 +132,11 @@ def test_snapshots_bounding_box_and_metadata():
             with self.beat("b01"):
                 c = Circle(radius=1.0, color=PRIMARY)
                 c.move_to(ORIGIN)
-                self.register("circle", c, essential=True, kind="object")
+                self.register("circle", c, essential=True, kind="object", group="grp_main")
 
-                t = Dot(color=SECONDARY).move_to(2.0 * RIGHT)
-                self.register("tracker", t, essential=False, kind="text")
+                # Text element with key=True
+                t = Text("Eigenvector", color=TEXT).move_to(2.0 * RIGHT)
+                self.register("label", t, essential=True, kind="text", group="grp_main", key=True)
 
                 self.add(c, t)
 
@@ -144,16 +153,21 @@ def test_snapshots_bounding_box_and_metadata():
     assert circle_info["name"] == "circle"
     assert circle_info["kind"] == "object"
     assert circle_info["essential"] is True
-    # Circle of radius 1 at origin has bbox [-1.0, -1.0, 1.0, 1.0]
+    assert circle_info["group"] == "grp_main"
+    assert circle_info["key"] is False
     assert circle_info["bbox"] == [-1.0, -1.0, 1.0, 1.0]
     assert circle_info["color"].lower() == str(PRIMARY).lower()
 
-    # Check tracker snapshot
-    tracker_info = mobjects["tracker"]
-    assert tracker_info["name"] == "tracker"
-    assert tracker_info["kind"] == "text"
-    assert tracker_info["essential"] is False
-    assert tracker_info["bbox"][0] > 1.0  # shifted right
+    # Check text snapshot
+    text_info = mobjects["label"]
+    assert text_info["name"] == "label"
+    assert text_info["kind"] == "text"
+    assert text_info["essential"] is True
+    assert text_info["group"] == "grp_main"
+    assert text_info["key"] is True
+    assert text_info["text"] == "Eigenvector"
+    assert "height_px" in text_info
+    assert text_info["height_px"] > 0
 
 
 def test_register_invalid_kind():
@@ -164,8 +178,8 @@ def test_register_invalid_kind():
         scene.register("bad", d, kind="widget")
 
 
-def test_chapter_dir_loading(tmp_path: Path):
-    """Verify BaseScene automatically loads script.json, audio/timings.json, and storyboard.json from chapter_dir."""
+def test_chapter_dir_loading_and_snapshot_file_persistence(tmp_path: Path):
+    """Verify BaseScene automatically loads chapter files and writes qa/snapshots_<layout>.json."""
     ch_dir = tmp_path / "ch01"
     ch_dir.mkdir()
     audio_dir = ch_dir / "audio"
@@ -185,11 +199,22 @@ def test_chapter_dir_loading(tmp_path: Path):
     class ChapterScene(BaseScene):
         def construct(self):
             with self.beat("b01"):
-                pass  # empty beat, should pad to full window (2.5 + 0.5 = 3.0s)
+                d = Dot()
+                self.register("dot", d)
+                self.play(FadeIn(d), run_time=0.5)
 
     scene = ChapterScene(chapter_dir=ch_dir)
     scene.render()
 
     assert abs(scene.time - 3.0) < 0.05
-    assert len(scene.snapshots) == 1
-    assert scene.snapshots[0].beat_id == "b01"
+    # Two snapshots: play sub-snapshot + end-of-beat snapshot
+    assert len(scene.snapshots) == 2
+
+    # Verify JSON file written to qa/snapshots_169.json
+    snapshot_json = ch_dir / "qa" / "snapshots_169.json"
+    assert snapshot_json.exists()
+    with open(snapshot_json, "r", encoding="utf-8") as f:
+        saved = json.load(f)
+    assert len(saved) == 2
+    assert saved[0]["label"] == "b01_0"
+    assert saved[1]["label"] == "b01"
