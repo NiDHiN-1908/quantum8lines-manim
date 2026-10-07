@@ -47,7 +47,7 @@ Every narration line carries a `cut` tag: `both` (default), `standalone_only` (e
 
 | Need | Tool | Notes |
 |---|---|---|
-| Animation | Manim Community (target v0.20.x; legacy project used 0.19.1) | Upgrade in M0 and pin |
+| Animation | Manim Community (0.21.0 pinned in M0; legacy project used 0.19.1) | Version pinned in `uv.lock` |
 | Environment | `uv` + lockfile | Python 3.11; reproducible installs |
 | Math truth | SymPy, NumPy | All facts computed here |
 | LaTeX | MiKTeX (already installed), `dvisvgm` | For MathTex |
@@ -70,11 +70,13 @@ All tools must work offline except the LLM calls.
 ```
 quantum8lines-manim/
 ├── SPEC.md
-├── brand/            intro/outro, logo, fonts, brand.json, mascot assets
+├── brand/            intro/outro, logo, fonts, brand.json, voices
+├── characters/       roster.json + <id>/character.json (approved designs, design sheets)
 ├── core/
 │   ├── tokens.py     design tokens loaded from brand/brand.json
 │   ├── layout.py     16:9 + 9:16 layout engine, safe zones
-│   ├── components/   vectors, matrices, graphs, equations, callouts, mascot
+│   ├── components/   vectors, matrices, graphs, equations, callouts
+│   ├── characters/   character rig: bodies, faces, limbs, states
 │   ├── mathengine/   SymPy/NumPy fact computation + claim checkers
 │   └── scene_base.py base Scene with audio-first timing
 ├── agents/           prompts (*.md) and schemas (*.py) per agent
@@ -129,10 +131,8 @@ The leftover `src/` folder from the legacy layout is removed in M0. Legacy code 
 - At most 7 distinct objects on screen at once (mascot and captions excluded).
 - Every reveal is paired with narration that explains it, and the highlight lands on the spoken word.
 
-### 4.5 Mascot
-- Original character derived from the brain icon (`brand/brain_icon.svg`), built as an SVG-based Mobject with a small set of states: `idle`, `blink`, `think`, `surprised`, `point`.
-- Appears at most 3 times per chapter and is never over the stage region. It never carries essential information.
-- Do not copy any existing channel's characters.
+### 4.5 Characters
+Characters are specified in section 20 (Characters and casting). The brain icon (`brand/brain_icon.svg`) is the **logo only**, used in the intro/outro, and is never animated as a character. Do not copy any existing channel's characters.
 
 ### 4.6 Intro / outro
 - Final intro file: `brand/Quantum8Line_Intro.mp4` (1280x720, 24 fps, ~10 s, with audio). The legacy 480p15 renders in `brand/` are drafts and are not used in production.
@@ -155,6 +155,7 @@ The leftover `src/` folder from the legacy layout is removed in M0. Legacy code 
   ],
   "prereqs": [],
   "voice_profile": "narrator_calm_01",
+  "cast": [{"character": "theta", "role": "host"}, {"character": "lambda", "role": "guest"}],
   "sources": ["textbook or reference names used to fact-check"]
 }
 ```
@@ -175,7 +176,7 @@ The leftover `src/` folder from the legacy layout is removed in M0. Legacy code 
 {
   "claims": [
     {"id": "c1", "type": "eigenpair", "matrix": [[2,1],[0,3]],
-     "vector": [1,0], "value": 2, "verified": true}
+     "vector": [1,0], "value": 2, "status": "verified"}
   ],
   "values": {"A": [[2,1],[0,3]], "eigvals": [2,3]}
 }
@@ -187,7 +188,8 @@ The leftover `src/` folder from the legacy layout is removed in M0. Legacy code 
   "chapter": "ch01",
   "beats": [
     {"id": "b01", "line_ids": ["l01"], "regions": {"stage": "..."},
-     "actions": [{"op": "show", "component": "VectorField", "args_from": "values.A"}],
+     "actions": [{"op": "show", "component": "VectorField", "args_from": "values.A"},
+                 {"op": "character", "id": "theta", "state": "think", "slot": "corner_br"}],
      "expect": {"visible": ["vector_v"], "text": "vector stays on its line"}}
   ]
 }
@@ -201,9 +203,10 @@ Every beat must reference script lines and facts, never raw numbers.
 | Agent | Input | Output | Must not |
 |---|---|---|---|
 | Curriculum planner | topic, audience | `bible.json` | Create chapters with more than one idea |
+| Casting agent | bible + chapter specs + `characters/roster.json` | `cast` in `bible.json`, per-chapter character plan | Use a character not in the roster; put more than 2 characters on screen at once; add a new character without a proposal and your approval (section 20) |
 | Scriptwriter | bible + chapter spec | `script.json` | State a number; write math claims without a claim id |
 | Math verifier | `script.json` claims | `facts.json` | Pass a claim it could not check; mark it `unverifiable` instead |
-| Storyboarder | script + facts | `storyboard.json` | Use components that are not in the library |
+| Storyboarder | script + facts | `storyboard.json` | Use components that are not in the library; reference a character id, state, or slot that does not exist |
 | Scene coder | storyboard + component docs | `scene.py` | Use numeric literals; import anything outside `core` |
 | QA agent | renders + storyboard | `qa/report.json` | Block on a vision-model opinion (advisory only) |
 | Publisher | final chapter/topic | title, description, tags, thumbnail brief | Claim features not in the video |
@@ -230,6 +233,7 @@ Rules:
 - Prefer exact (rational/symbolic) arithmetic. Use floats only for plotting.
 - Components that draw math take **objects from `facts.json`**, so drawing from a wrong number is not possible by construction.
 - New claim types are added with unit tests first.
+- Any formula given as text is parsed only through `core/mathengine/safe_parse.py` (restricted parser). Never use `eval`, `sympify`, or `parse_expr` on raw strings anywhere else.
 
 ---
 
@@ -257,7 +261,7 @@ Auto-fix loop: for `code` and `test_render` failures, the scene coder gets the e
 | G3 Plan review | storyboard | **human** approves script + storyboard in review UI |
 | G4 Code | code | lints clean (no numeric literals outside layout constants, no raw colors, imports only from `core`); scene constructs without error |
 | G5 Render test | test_render | low-res render succeeds; no empty frames; duration within ±0.3 s of audio |
-| G6 Visual | qa_visual | at each beat's keyframe: all objects inside safe area; no overlapping text/objects; min text size; contrast above threshold; every `expect.visible` item present |
+| G6 Visual | qa_visual | at each beat's keyframe: all objects inside safe area; no overlapping text/objects; min text size; contrast above threshold; every `expect.visible` item present; characters stay in their slot, never cover essential objects, at most 2 on screen, and only use states defined for that character |
 | G7 Audio | mix | integrated loudness within target; no clipping |
 | G8 Final review | export | **human** watches both versions and approves |
 
@@ -380,6 +384,7 @@ Pages:
 - [ ] YouTube policy check: disclosure of synthetic/altered content, and monetization rules for automated or repetitive content (rules change; read the current ones)
 - [ ] Instagram safe-zone values re-verified against the current app UI
 - [ ] Source list for factual claims in each topic recorded in `bible.json`
+- [ ] If any generated art is used (concept art, thumbnails), the generator's terms allow commercial use of its outputs
 
 ---
 
@@ -387,10 +392,11 @@ Pages:
 
 | ID | Milestone | Done when |
 |---|---|---|
-| M0 | Environment | `uv` project, pinned Manim 0.20.x and deps, `legacy` `src/` removed, hello scene renders in 16:9 and 9:16 |
+| M0 | Environment | `uv` project, pinned Manim and deps, `legacy` `src/` removed, hello scene renders in 16:9 and 9:16 |
 | M1 | Design system | tokens, layout engine with safe zones, intro/outro integration, 9:16 sting, font setup, tests green |
 | M2 | Components + math engine | vector, matrix, graph, equation, callout, mascot components; claim checkers with tests; reference-frame tests |
-| M3 | Audio pipeline | TTS engine interface, voice profiles (3 tone presets), Voice Lab page with blind mode, lexicon, alignment, ASS captions, loudness mix; at least one voice passes the blind acceptance test and is approved by you |
+| M3 | Audio pipeline (built as M3a and M3b) | TTS engine interface, voice profiles (3 tone presets), Voice Lab page with blind mode, lexicon, alignment, ASS captions, loudness mix; at least one voice passes the blind acceptance test and is approved by you |
+| M2.2 | Character system | `core/characters` rig (body, face, limbs, states); roster with two characters (Theta, Lambda) whose design sheet you approved; v1 states; a brand orange token; polish items (heavier strokes, axis numbers, subtle brand glow, true-peak margin of -1.5 dBTP in `normalize()`); reference frames regenerated once |
 | M4 | QA gates | G4-G7 implemented and demonstrably catching seeded errors (wrong number, off-screen object, overlapping text) |
 | M5 | Agents | all agents produce schema-valid output; prompts versioned; end-to-end dry run on a stub topic |
 | M6 | Pilot chapter | one chapter fully through all gates, both formats, approved by you |
@@ -425,4 +431,68 @@ Do not start a milestone before the previous one is done. Seeded-error tests in 
 - [ ] Background music source
 - [ ] Whether the long video gets a synthesis chapter by default
 - [ ] LLM provider order and local fallback model
-- [ ] Hardware limits (render time per chapter) measured in M0
+- [x] Hardware recorded in `docs/environment.md` at M0 (Windows 11 laptop, i7-13620H, 15.6 GB RAM, RTX 4050 6 GB)
+- [ ] Realistic render time per chapter: M0 only timed a 2 s test scene, so measure with a heavier scene in M1/M2
+- [ ] Cast confirmed: Theta (host) and Lambda (guest)
+- [ ] Character design sheet approved (neutral pose, faces, poses, both layouts)
+- [ ] Minimum on-screen character height, set after the design sheet is approved
+
+---
+
+## 20. Characters and casting
+
+### 20.1 Principles
+- Characters are **original and built in code** from vector shapes (no raster or AI-generated body images), so any pose or expression is available, the look stays consistent, and they render crisply at any size.
+- Do not copy any existing channel's characters. In particular, no pi-shaped creature with eyes on a top bar.
+- The channel has one fixed **host** for recognition. **Guests** vary by topic.
+- v1 characters are **silent** (pantomime and reactions). The narrator voice (section 10) stays the only voice until a dialogue format is specified.
+- The brain icon is the logo only and is not a character.
+
+### 20.2 Roster
+`characters/roster.json` lists the approved characters. Each has `characters/<id>/character.json`:
+```json
+{
+  "id": "theta",
+  "symbol": "θ",
+  "name": "Theta",
+  "role": "host",
+  "personality": "curious, a bit impatient; asks 'wait, why?'",
+  "palette": {"body": "PRIMARY", "accent": "HIGHLIGHT"},
+  "suits_topics": ["angles", "trigonometry", "rotations", "general"],
+  "rig": {"body": "theta_body", "face": "default", "limbs": "default"},
+  "states": ["idle", "blink", "think", "surprised", "point", "wave"],
+  "status": "approved"
+}
+```
+- `palette` uses design-token names only. If no orange token exists, M2.2 adds one (from `brand/brand.json`) for Lambda.
+- `status` is `proposed`, `approved`, or `retired`. Only `approved` characters can be cast.
+- Starting roster (pending design approval): **Theta (θ)**, host, blue; **Lambda (λ)**, guest for eigenvalue and eigenvector topics, orange.
+
+### 20.3 Rig (`core/characters/`)
+- `CharacterRig` base class: a body shape factory per symbol (thick, rounded, with a subtle brand glow), named anchor points (face, shoulders, hips), a face (eyes with pupils, brows, mouth shapes: smile, open, "o", flat, smirk), arms with simple mitten hands, short legs with round shoes.
+- States are methods that return Manim animations. `point(target)` aims an arm at any point.
+- **v1 states:** idle (bob), blink, think, surprised, point, wave. **v2:** celebrate, confused, explain, walk in/out, peek.
+- Strokes are heavy enough to read on a phone (values in `core.tokens`). Glow is subtle to keep render time down.
+- Characters read colors and sizes from tokens only, like every other component.
+
+### 20.4 Casting agent
+- Runs once per topic after the bible exists. It chooses the host (default: the channel host) and optional guests from the roster, by topic fit and role, and writes `cast` into `bible.json`.
+- It then writes a per-chapter character plan: who appears, in which beats, in which state and slot. Each character appears at most 3 times per chapter, to react to key beats rather than decorate.
+- Rules: roster characters only; at most 2 on screen at once (at most 1 in 9:16 unless the slot layout allows two); a guest appears only in chapters where its symbol is relevant.
+
+### 20.5 New characters
+- The casting agent may **propose** a new character (symbol, role, personality, palette tokens, reason) as `characters/_proposals/<id>.json`. It never adds one silently.
+- The pipeline builds a **design sheet** from the rig template (neutral pose, all faces, all poses, both layouts). You approve (status becomes `approved` and it joins the roster) or reject.
+- A topic can proceed without a proposed character while it awaits approval.
+
+### 20.6 Slots and layout
+- Characters occupy named slots defined per layout in `core.layout`: `corner_br`, `corner_bl`, `corner_tr`, `corner_tl`, and `guest_edge` (a zone at the stage edge for pointing and entering).
+- In 9:16, slots clear the caption region and the unsafe zones. Characters never cover essential objects (checked in G6).
+
+### 20.7 Tests and gates
+- Every character renders every one of its states in both layouts without errors.
+- Reference frames for each character's neutral pose in both layouts, with negative tests proving a changed design fails.
+- G3 (human review) includes the cast plan. G4 lint fails on a character id, state, or slot that does not exist. G6 applies the character checks in section 9.
+
+### 20.8 Review UI
+- A Cast Lab page (M8) shows the roster and design sheets and lets you approve or reject proposals. Until then, you approve design sheets by reviewing the images.
