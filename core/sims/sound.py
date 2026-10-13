@@ -12,6 +12,7 @@ Follows Milestone P1 Step 3.
 
 import math
 from pathlib import Path
+import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -268,6 +269,20 @@ def verify_audio_quality(audio_path: Union[str, Path]) -> Dict[str, Any]:
     p = Path(audio_path).resolve()
     if not p.is_file():
         raise FileNotFoundError(f"Audio file not found: {p}")
+
+    if p.suffix.lower() != ".wav":
+        # Decode container audio to temporary WAV for soundfile
+        with tempfile.TemporaryDirectory() as td:
+            temp_wav = Path(td) / "temp_extracted.wav"
+            cmd = [
+                "ffmpeg", "-y", "-nostdin",
+                "-i", str(p),
+                "-vn",
+                "-c:a", "pcm_s16le",
+                str(temp_wav),
+            ]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            return verify_audio_quality(temp_wav)
 
     meas = measure_loudness(p)
     lufs = meas["integrated_lufs"]
