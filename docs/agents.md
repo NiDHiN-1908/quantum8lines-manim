@@ -79,17 +79,17 @@ Specifies execution parameters per agent role:
     },
     "curriculum_planner": {
       "provider": "ollama",
-      "model": "<fill-in>",
-      "temperature": 0.7,
-      "num_ctx": 8192,
+      "model": "llama3.1:latest",
+      "temperature": 0.3,
+      "num_ctx": 4096,
       "timeout": 120.0,
       "max_retries": 3
     },
     "scriptwriter": {
       "provider": "ollama",
-      "model": "<fill-in>",
-      "temperature": 0.5,
-      "num_ctx": 8192,
+      "model": "llama3.1:latest",
+      "temperature": 0.6,
+      "num_ctx": 4096,
       "timeout": 120.0,
       "max_retries": 3
     }
@@ -97,6 +97,24 @@ Specifies execution parameters per agent role:
 }
 ```
 *Note: Real providers fail with a clear exception if their model remains `<fill-in>` or empty.*
+
+### VRAM Budget and `num_ctx` Selection (6 GB VRAM)
+- **Host GPU:** NVIDIA GeForce RTX 4050 Laptop GPU (6,141 MiB dedicated VRAM).
+- **Model:** `llama3.1:latest` (Llama-3.1-8B-Instruct quantized to Q4_K_M).
+- **Model Weight Footprint:** ~4.7–4.9 GB loaded in GPU memory.
+- **KV Cache Sizing:**
+  - Llama 3.1 8B uses 32 layers, 8 key-value heads, and head dimension 128 (GQA).
+  - Each token requires: `2 * 32 layers * 8 KV heads * 128 dim * 2 bytes (FP16) = 131,072 bytes (128 KB)`.
+  - At `num_ctx = 2048`: KV cache is `2048 * 128 KB = 256 MB`.
+  - At `num_ctx = 4096`: KV cache is `4096 * 128 KB = 512 MB`.
+  - At `num_ctx = 8192`: KV cache is `8192 * 128 KB = 1024 MB` (1.0 GB).
+- **Justification for `num_ctx = 4096`:**
+  - With 4.9 GB model weights + 512 MB KV cache + ~200 MB CUDA runtime overhead, total VRAM consumption is approximately **5.4 GB**, comfortably under the hard 6.0 GB ceiling.
+  - Setting `num_ctx = 8192` pushes total allocation above 6.1 GB, causing Ollama to offload layers to system RAM or invoke memory paging, which collapses generation speed.
+  - 4096 tokens provides ample room for the Curriculum Planner (~600 token prompt + ~1000 token output) and the Scriptwriter (~900 token prompt + ~400 token script output), ensuring complete zero-truncation execution at maximum GPU throughput.
+- **Temperatures:**
+  - `curriculum_planner`: **0.3** ensures disciplined, structured syllabus design and consistent pedagogical progression.
+  - `scriptwriter`: **0.6** allows creative, natural spoken phrasing and metaphor while staying within mathematical constraints.
 
 ### Environment Variables (`.env`)
 The lightweight `.env` parser (`agents/llm/env.py`) populates `os.environ` without overwriting existing system variables.

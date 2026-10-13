@@ -78,6 +78,7 @@ def write_script(
     chapter_dir: Union[str, Path],
     provider: Optional[LLMProvider] = None,
     max_regen_attempts: int = 3,
+    chapter_id: Optional[Union[str, int]] = None,
 ) -> Dict[str, Any]:
     """
     Scriptwriting stage:
@@ -102,9 +103,15 @@ def write_script(
     if bible_path is not None:
         bible_data = json.loads(bible_path.read_text(encoding="utf-8"))
         bible = Bible.model_validate(bible_data)
-        # Match chapter spec by id or default to first
-        ch_id = ch_path.name
-        matched_ch = next((c for c in bible.chapters if c.id == ch_id), bible.chapters[0])
+        # Match chapter spec by index or id or default to first
+        if isinstance(chapter_id, int):
+            ch_idx = max(0, min(chapter_id - 1, len(bible.chapters) - 1))
+            matched_ch = bible.chapters[ch_idx]
+        elif isinstance(chapter_id, str):
+            matched_ch = next((c for c in bible.chapters if c.id == chapter_id), bible.chapters[0])
+        else:
+            ch_id = ch_path.name
+            matched_ch = next((c for c in bible.chapters if c.id == ch_id), bible.chapters[0])
     else:
         # Fallback default chapter spec
         bible = Bible(

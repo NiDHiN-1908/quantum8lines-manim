@@ -301,5 +301,31 @@ def run_g1_script(
             )
         )
 
+    # 11. Math lines have claims (G1j_math_lines_have_claims)
+    math_lines_missing_claims = []
+    for line in lines:
+        beat = line.get("beat")
+        if beat in ("build", "aha"):
+            claims = line.get("claims", [])
+            has_claims = isinstance(claims, list) and len(claims) > 0
+            no_math = bool(line.get("no_math", False))
+            if not has_claims and not no_math:
+                math_lines_missing_claims.append(str(line.get("id", "")))
+
+    g1j_passed = len(math_lines_missing_claims) == 0
+    checks.append(
+        Check(
+            id="G1j_math_lines_have_claims",
+            passed=g1j_passed,
+            severity="error",
+            message="All build and aha lines reference at least one claim or specify no_math: true."
+            if g1j_passed
+            else f"Line(s) {math_lines_missing_claims} with beat 'build' or 'aha' must list at least one claim ID or carry 'no_math': true.",
+            details={"missing_math_claim_lines": math_lines_missing_claims}
+            if math_lines_missing_claims
+            else None,
+        )
+    )
+
     return GateResult.create("G1", checks)
 

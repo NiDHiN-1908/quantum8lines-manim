@@ -71,7 +71,8 @@ CANNED_VALID_SCRIPT = {
             "id": "l03",
             "text": "However along special lines through the origin vectors only get scaled by a numerical factor rather than knocked off their span completely.",
             "beat": "build",
-            "cut": "both"
+            "cut": "both",
+            "no_math": True,
         },
         {
             "id": "l04",

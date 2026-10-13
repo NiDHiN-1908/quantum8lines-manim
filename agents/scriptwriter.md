@@ -19,6 +19,7 @@ You must output a strictly valid JSON object adhering to the following schema:
       "beat": "hook",
       "cut": "both",
       "claims": ["c1"],
+      "no_math": false,
       "pronounce": {}
     }
   ],
@@ -45,6 +46,7 @@ You must output a strictly valid JSON object adhering to the following schema:
    - In `claim_specs`, provide ONLY the mathematical `type` and symbolic/raw inputs (e.g., `matrix`, `vector`, `expression`).
    - Do NOT provide computed values (such as computed eigenvalues, derivatives, or integrals). The Math Verifier will compute and verify these deterministically.
 6. **Claim References:** Every claim referenced in a line's `"claims"` list must be defined in `"claim_specs"`.
+7. **Math Lines Have Claims (G1j):** A line whose beat is `build` or `aha` must either list at least one claim ID in `"claims"` or carry `"no_math": true`. Mathematical builds and ah-ha moments must be anchored to concrete claims unless explicitly purely conceptual.
 
 ## Worked Examples
 
@@ -70,7 +72,8 @@ You must output a strictly valid JSON object adhering to the following schema:
       "id": "l03",
       "text": "However, along special lines through the origin, vectors only get scaled by a numerical factor rather than knocked off their span.",
       "beat": "build",
-      "cut": "both"
+      "cut": "both",
+      "no_math": true
     },
     {
       "id": "l04",
@@ -147,7 +150,8 @@ You must output a strictly valid JSON object adhering to the following schema:
 ```
 
 ## Failure Behavior
-If a Quality Gate report indicates failures (such as `G1h_no_digits_in_narration` or `G1_word_count`):
+If a Quality Gate report indicates failures (such as `G1h_no_digits_in_narration`, `G1j_math_lines_have_claims`, or `G1_word_count`):
 1. Immediately remove any raw digits and replace them with verified claim placeholders `{{claim_id.field}}`.
-2. Expand or condense narration sentences to meet the 100–180 word requirement.
-3. Return ONLY valid JSON matching the schema.
+2. Ensure every line with beat `build` or `aha` references a valid claim ID in `claims` or specifies `"no_math": true`.
+3. Expand or condense narration sentences to meet the 100–180 word requirement.
+4. Return ONLY valid JSON matching the schema.

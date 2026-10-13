@@ -263,3 +263,40 @@ def test_case_10_script_with_out_of_order_beats(clean_chapter_data):
     assert check is not None
     assert check.passed is False
     assert "canonical order" in check.message.lower()
+
+
+def test_g1j_math_lines_have_claims_seeded_failure(clean_chapter_data):
+    """G1j seeded failure: build or aha line has no claims and no_math=False -> trips G1j_math_lines_have_claims."""
+    script = deepcopy(clean_chapter_data["script"])
+    # Line l03 is 'build'; remove claims and ensure no_math is False
+    script["lines"][2]["claims"] = []
+    script["lines"][2]["no_math"] = False
+
+    res = run_g1_script(
+        script_data=script,
+        facts_data=clean_chapter_data["facts"],
+    )
+    assert res.passed is False
+    check = res.get_check("G1j_math_lines_have_claims")
+    assert check is not None
+    assert check.passed is False
+    assert "l03" in check.message
+
+
+def test_g1j_math_lines_have_claims_pass(clean_chapter_data):
+    """G1j pass: build and aha lines either list claims or carry no_math=True."""
+    script = deepcopy(clean_chapter_data["script"])
+    # Line l03 carries no_math=True, line l04 lists claims=["c1"]
+    script["lines"][2]["claims"] = []
+    script["lines"][2]["no_math"] = True
+    script["lines"][3]["claims"] = ["c1"]
+    script["lines"][3]["no_math"] = False
+
+    res = run_g1_script(
+        script_data=script,
+        facts_data=clean_chapter_data["facts"],
+    )
+    check = res.get_check("G1j_math_lines_have_claims")
+    assert check is not None
+    assert check.passed is True
+

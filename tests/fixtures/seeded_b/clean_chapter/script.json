@@ -18,13 +18,15 @@
       "id": "l03",
       "text": "As we progressively construct our algebraic relationship observe how the verified values from our mathematical engine guide the visual trajectory directly forward.",
       "beat": "build",
-      "cut": "both"
+      "cut": "both",
+      "no_math": true
     },
     {
       "id": "l04",
       "text": "Here is the key insight when zero is added to any variable the identity transformation preserves the original value completely unaltered.",
       "beat": "aha",
-      "cut": "both"
+      "cut": "both",
+      "no_math": true
     },
     {
       "id": "l05",

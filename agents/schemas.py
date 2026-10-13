@@ -58,6 +58,7 @@ class ScriptLine(BaseModel):
     beat: str = Field(description="Beat tag: hook, setup, build, aha, close")
     cut: str = Field(default="both", description="Cut tag: both, short, long")
     claims: List[str] = Field(default_factory=list, description="Referenced claim IDs in this line")
+    no_math: bool = Field(default=False, description="Flag indicating this beat line has no mathematical claims")
     pronounce: Dict[str, str] = Field(default_factory=dict, description="Phonetic respellings for lexicon")
 
 

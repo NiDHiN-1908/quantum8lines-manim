@@ -117,6 +117,7 @@ def run_agent(
                 num_ctx=effective_ctx,
                 timeout=effective_timeout,
                 agent_name=agent_name,
+                schema=schema,
             )
 
             # Strip code fences and parse JSON

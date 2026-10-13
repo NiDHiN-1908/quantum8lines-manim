@@ -18,13 +18,15 @@
       "id": "l03",
       "text": "However, along special lines through the origin, vectors only get scaled by a numerical factor rather than knocked off their span.",
       "beat": "build",
-      "cut": "both"
+      "cut": "both",
+      "no_math": true
     },
     {
       "id": "l04",
       "text": "This scaling factor is the eigenvalue, and the span that preserves direction is the eigenspace. Everything falls into place naturally.",
       "beat": "aha",
-      "cut": "both"
+      "cut": "both",
+      "no_math": true
     },
     {
       "id": "l05",
