@@ -59,7 +59,7 @@ Every narration line carries a `cut` tag: `both` (default), `standalone_only` (e
 | Orchestration | Plain Python + pydantic | No agent framework until needed |
 | Review UI | Streamlit (local) | Approval gates |
 | Tests | pytest | Includes reference-frame tests |
-| LLMs | Model-agnostic interface | Hosted free tier via Antigravity; Ollama local fallback. Check current free-tier limits before batch runs |
+| LLMs | Provider-agnostic interface (section 21) | Ollama first (cloud models for the heavy agents, a small local model for light tasks); Gemini optional; mock provider for tests. Check current free-tier limits before batch runs |
 
 All tools must work offline except the LLM calls.
 
@@ -165,11 +165,13 @@ Characters are specified in section 20 (Characters and casting). The brain icon 
 {
   "chapter": "ch01",
   "lines": [
-    {"id": "l01", "text": "...", "beat": "hook", "cut": "both",
+    {"id": "l01", "text": "A times v equals {{c1.value}} times v.", "beat": "hook", "cut": "both",
      "claims": ["c1"], "pronounce": {"eigenvector": "EYE-gen-vector"}}
   ]
 }
 ```
+
+**Numbers in narration are placeholders.** `text` never contains digits. A spoken number comes from a verified claim as `{{claim_id.field}}` (for example `{{c1.value}}`). Code resolves placeholders to spoken English words (`Facts.spoken`) for TTS and captions, and to LaTeX (`Facts.latex`) on screen. Number words written directly by an agent (for example "two") are flagged as warnings at G1 for review at G3.
 
 ### 5.3 `facts.json` (computed, never written by an LLM)
 ```json
@@ -256,7 +258,7 @@ Auto-fix loop: for `code` and `test_render` failures, the scene coder gets the e
 
 | Gate | After | Pass criteria |
 |---|---|---|
-| G1 Script | script | schema valid; word count in range; every claim id exists; beat order correct |
+| G1 Script | script | schema valid; word count in range; every claim id exists; beat order correct; no digits in narration text (numbers come from `{{claim_id.field}}` placeholders that resolve to verified claims; number words outside placeholders are warnings) |
 | G2 Math | verify | 100% of claims `verified` (none failed or unverifiable) |
 | G3 Plan review | storyboard | **human** approves script + storyboard in review UI |
 | G4 Code | code | lints clean (no numeric literals outside layout constants, no raw colors, imports only from `core`); scene constructs without error |
@@ -398,7 +400,9 @@ Pages:
 | M3 | Audio pipeline (built as M3a and M3b) | TTS engine interface, voice profiles (3 tone presets), Voice Lab page with blind mode, lexicon, alignment, ASS captions, loudness mix; at least one voice passes the blind acceptance test and is approved by you |
 | M2.2 | Character system | `core/characters` rig (body, face, limbs, states); roster with two characters (Theta, Lambda) whose design sheet you approved; v1 states; a brand orange token; polish items (heavier strokes, axis numbers, subtle brand glow, true-peak margin of -1.5 dBTP in `normalize()`); reference frames regenerated once |
 | M4 | QA gates | G4-G7 implemented and demonstrably catching seeded errors (wrong number, off-screen object, overlapping text) |
-| M5 | Agents | all agents produce schema-valid output; prompts versioned; end-to-end dry run on a stub topic |
+| M5a | Agent framework | provider interface (Ollama, optional Gemini, mock), config file, schema validation with a retry loop, agent logs, placeholder resolution, Curriculum planner and Scriptwriter agents, the Math verifier stage; all tested offline with the mock provider; Ollama connectivity check |
+| M5b | Production agents | Storyboarder, Scene coder (with the G4/G5/G6 feedback loop, run in a subprocess with a timeout), Casting agent (needs M2.2), Publisher |
+| M5c | Orchestrator | one command runs a topic through all stages with checkpointing, stops at the human gates, and resumes; dry run on a stub topic with the mock provider |
 | M6 | Pilot chapter | one chapter fully through all gates, both formats, approved by you |
 | M7 | Pilot topic | all chapters of the pilot topic + long video compile |
 | M8 | Review UI + publisher | UI covers all gates; publisher outputs titles/descriptions/thumbnail briefs |
@@ -430,7 +434,7 @@ Do not start a milestone before the previous one is done. Seeded-error tests in 
 - [ ] Alignment method (whisper size vs forced aligner), decided in M3 on accuracy and speed
 - [ ] Background music source
 - [ ] Whether the long video gets a synthesis chapter by default
-- [ ] LLM provider order and local fallback model
+- [ ] LLM provider order (Ollama first, Gemini optional) and the exact model names, chosen after the M5a connectivity check
 - [x] Hardware recorded in `docs/environment.md` at M0 (Windows 11 laptop, i7-13620H, 15.6 GB RAM, RTX 4050 6 GB)
 - [ ] Realistic render time per chapter: M0 only timed a 2 s test scene, so measure with a heavier scene in M1/M2
 - [ ] Cast confirmed: Theta (host) and Lambda (guest)
@@ -496,3 +500,25 @@ Do not start a milestone before the previous one is done. Seeded-error tests in 
 
 ### 20.8 Review UI
 - A Cast Lab page (M8) shows the roster and design sheets and lets you approve or reject proposals. Until then, you approve design sheets by reviewing the images.
+
+---
+
+## 21. LLM providers and agent runtime
+
+### 21.1 Provider interface
+- `agents/llm/` exposes one interface, `LLMProvider.complete(system, user, ...)`. Adapters: `ollama` (default), `gemini` (optional, key from the environment, imported lazily so the repo works without it), and `mock` (deterministic canned responses from fixtures, used by all tests).
+- Provider, model name, temperature, context size, timeout, and max retries are set per agent role in `config/llm.json`. **Model names are never hard-coded in code**, because hosted model lists change often.
+- API keys come only from environment variables or an ignored `.env` file. Nothing secret is ever committed.
+
+### 21.2 Structured output and retries
+- Every agent returns JSON validated by its pydantic schema. Invalid or unparsable output is retried at most 3 times, each time feeding the exact validation error back to the model. After that the stage fails with a report.
+- Each attempt's prompt, response, error, and timing are saved to `topics/<topic>/chapters/<ch>/agent_logs/` (git-ignored) for debugging.
+
+### 21.3 Rules for specific agents
+- The **Math verifier is code, not an LLM**: it takes the claim specs proposed by the Scriptwriter and computes `facts.json` with `core/mathengine`. Agents never supply computed values.
+- **Scene coder** output is checked by G4 before it is executed. Execution (dry run and renders) happens in a subprocess with a timeout. On a gate failure the coder receives the failing check ids and messages and may retry up to 3 times.
+- Agents never write or edit `SPEC.md`, gate code, or tests.
+
+### 21.4 Free-tier and privacy notes
+- Cloud models send prompts to the provider's servers. Topics, scripts, and scene code are fine; nothing private is ever sent.
+- Check each provider's current free-tier limits and terms before batch runs; they change.
