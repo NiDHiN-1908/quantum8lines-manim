@@ -14,6 +14,7 @@ class BibleChapter(BaseModel):
     title: str = Field(description="Engaging, concise title")
     one_idea: str = Field(description="The single core concept taught in this chapter")
     question_it_raises: str = Field(description="The natural question leading to the next chapter")
+    new_terms: List[str] = Field(default_factory=list, description="Key mathematical terms introduced in this chapter")
 
 
 class Bible(BaseModel):

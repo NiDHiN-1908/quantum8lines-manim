@@ -76,6 +76,14 @@ Executed immediately after the scriptwriter produces `script.json`.
 | `G1_word_count` | Sums word counts of `line["text"]` across all lines; must fall within `[min_words, max_words]`. | Script too brief (<100 words) or too long (>180 words). |
 | `G1_beat_order` | Enforces that beats never regress backwards relative to `canonical_beat_order`. | Beat regression (e.g. `build` followed by `setup`). |
 | `G1_claim_ids_exist` | Validates that every claim ID referenced in `line["claims"]` exists in `facts.json`. | Referenced claim ID missing from `facts.json`. |
+| `G1h_no_digits_in_narration` | Forbids raw ASCII digits in narration outside `{{claim_id.field}}` placeholders. | Literal digits (e.g. `2`, `42`) spoken without verified claim backing. |
+| `G1i_number_words` | Emits advisory warnings when English number words appear outside placeholders. | Advisory review flag for number words (e.g. "two", "three"). |
+| `G1j_math_lines_have_claims` | Lines with beat `build` or `aha` must list claim IDs in `claims` or set `no_math: true`. | Math beat line without anchored claims or explicit conceptual tag. |
+| `G1k_no_meta_text` | Rejects narration containing meta words (`narration`, `script`, `placeholder`, `json`, `claim`, `beat`, `written for the ear`) or unresolved `{{`/`}}`. | Structural meta-text leaked into spoken script. |
+| `G1k2_no_prompt_echo` | Rejects narration lines having difflib ratio >= 0.8 against prompt examples, or sharing a contiguous 6-word run. | LLM echoes or plagiarizes prompt worked examples. |
+| `G1n_line_quality` | Enforces 4 to 40 words per line, terminal punctuation (`.`, `?`, `!`), unique lines, and hook is a question or >= 6 words. | Run-on, fragmented, unpunctuated, or duplicate narration lines. |
+| `G1l_chapter_fit` | Verifies content word overlap between narration and the chapter's `one_idea` (stemmed, stopwords filtered). | Error if 0 overlap; warning if < 2 distinct matching terms. |
+| `G1m_no_future_terms` | Forbids using mathematical terms designated as `new_terms` in subsequent chapters of `bible.json`. | Introducing later syllabus concepts prematurely. |
 
 ---
 

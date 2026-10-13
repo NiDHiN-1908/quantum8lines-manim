@@ -22,7 +22,8 @@ You must output a strictly valid JSON object adhering to the following schema:
       "id": "ch01",
       "title": "string",
       "one_idea": "string (the single fundamental concept taught)",
-      "question_it_raises": "string (the question that leads directly into the next chapter)"
+      "question_it_raises": "string (the question that leads directly into the next chapter)",
+      "new_terms": ["list of terms newly introduced in this chapter"]
     }
   ],
   "prereqs": ["list of concepts assumed known"],
@@ -38,6 +39,7 @@ You must output a strictly valid JSON object adhering to the following schema:
 3. **Leading Questions:** Every chapter must end with `question_it_raises` that smoothly motivates the subsequent chapter.
 4. **Voice Profile:** Always leave `"voice_profile": ""` empty; it will be assigned later in Voice Lab.
 5. **No Speculative Characters:** Leave `"cast": []` empty unless specified.
+6. **Progressive Terminology (`new_terms`):** Each chapter must provide `new_terms: list[str]` specifying the exact mathematical terms that chapter introduces for the first time. Earlier chapters must never introduce or use terms that belong to later chapters.
 
 ## Worked Examples
 
@@ -57,25 +59,29 @@ You must output a strictly valid JSON object adhering to the following schema:
       "id": "ch01",
       "title": "Directions That Refuse to Turn",
       "one_idea": "Most vectors change direction under matrix transformation, but special vectors only stretch.",
-      "question_it_raises": "By what factor do these special vectors stretch?"
+      "question_it_raises": "By what factor do these special vectors stretch?",
+      "new_terms": ["transformation", "vector", "stretch"]
     },
     {
       "id": "ch02",
       "title": "The Scaling Factor",
       "one_idea": "The eigenvalue λ measures how much an eigenvector stretches or flips.",
-      "question_it_raises": "How do we find all possible stretch factors systematically?"
+      "question_it_raises": "How do we find all possible stretch factors systematically?",
+      "new_terms": ["eigenvalue", "scaling factor", "eigenspace"]
     },
     {
       "id": "ch03",
       "title": "Collapsing Space with Determinants",
       "one_idea": "Eigenvalues satisfy det(A - λI) = 0 because the transformation must squish space.",
-      "question_it_raises": "What happens once the eigenvalues are known?"
+      "question_it_raises": "What happens once the eigenvalues are known?",
+      "new_terms": ["determinant", "characteristic equation"]
     },
     {
       "id": "ch04",
       "title": "Reconstructing the Eigenbasis",
       "one_idea": "Expressing space in an eigenbasis uncouples complex systems into simple scalar stretches.",
-      "question_it_raises": "Where does this geometric duality appear in modern physics and algorithms?"
+      "question_it_raises": "Where does this geometric duality appear in modern physics and algorithms?",
+      "new_terms": ["eigenbasis", "diagonalization"]
     }
   ],
   "prereqs": ["matrix-vector multiplication", "determinants", "vector spaces"],
@@ -101,25 +107,29 @@ You must output a strictly valid JSON object adhering to the following schema:
       "id": "ch01",
       "title": "Average Speed Over an Interval",
       "one_idea": "Average rate of change is the slope of the secant line between two distinct points.",
-      "question_it_raises": "What happens when the two points get infinitely close?"
+      "question_it_raises": "What happens when the two points get infinitely close?",
+      "new_terms": ["average rate of change", "secant line"]
     },
     {
       "id": "ch02",
       "title": "The Vanishing Interval",
       "one_idea": "As the step size h approaches zero, the secant line tilts into a unique tangent line.",
-      "question_it_raises": "How do we compute this slope algebraically without dividing by zero?"
+      "question_it_raises": "How do we compute this slope algebraically without dividing by zero?",
+      "new_terms": ["tangent line", "instantaneous rate"]
     },
     {
       "id": "ch03",
       "title": "The Difference Quotient",
       "one_idea": "Factoring out h cancels the zero in the denominator and reveals the true limit.",
-      "question_it_raises": "Can we turn this operation into a new function for every point on the curve?"
+      "question_it_raises": "Can we turn this operation into a new function for every point on the curve?",
+      "new_terms": ["difference quotient", "limit"]
     },
     {
       "id": "ch04",
       "title": "The Tangent Landscape",
       "one_idea": "The derivative function outputs the exact slope of the original graph at every single input.",
-      "question_it_raises": "How does the derivative reveal peaks, valleys, and real-world motion?"
+      "question_it_raises": "How does the derivative reveal peaks, valleys, and real-world motion?",
+      "new_terms": ["derivative function"]
     }
   ],
   "prereqs": ["functions and graphs", "slope formula", "basic algebraic factoring"],

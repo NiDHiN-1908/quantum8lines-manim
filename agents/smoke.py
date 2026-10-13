@@ -57,26 +57,30 @@ def build_mock_provider() -> MockProvider:
                 {
                     "id": "ch01",
                     "title": "Invariant Directions",
-                    "one_idea": "Matrices can transform space while preserving special directions",
-                    "question_it_raises": "How do we compute the scaling factor along these invariant directions?",
+                    "one_idea": "Special vectors only scale along their original line without rotating.",
+                    "question_it_raises": "How much do these invariant directions stretch?",
+                    "new_terms": ["transformation", "vector", "scaling", "subspace"],
                 },
                 {
                     "id": "ch02",
                     "title": "Scaling Factors",
                     "one_idea": "Eigenvalues quantify stretching along invariant directions",
                     "question_it_raises": "How do we find these values without guessing?",
+                    "new_terms": ["characteristic polynomial", "trace"],
                 },
                 {
                     "id": "ch03",
                     "title": "The Characteristic Equation",
                     "one_idea": "Setting determinant to zero uncovers eigenvalues",
                     "question_it_raises": "Can every matrix be completely described by its eigenvectors?",
+                    "new_terms": ["characteristic equation", "determinant"],
                 },
                 {
                     "id": "ch04",
                     "title": "Diagonalization and Beyond",
                     "one_idea": "Decoupling systems into independent eigen-coordinates",
                     "question_it_raises": "Where does this geometric framework apply in the real world?",
+                    "new_terms": ["diagonalization", "eigenbasis"],
                 },
             ],
             "prereqs": ["matrix multiplication", "vectors in 2D coordinate space"],
@@ -93,40 +97,36 @@ def build_mock_provider() -> MockProvider:
             "lines": [
                 {
                     "id": "l01",
-                    "text": "What if a matrix could transform space while keeping certain special directions completely unchanged? This is the central question of linear algebra.",
+                    "text": "Can a linear transformation warp the entire coordinate plane while leaving certain geometric directions completely invariant across the space?",
                     "beat": "hook",
                     "cut": "both",
                     "claims": ["c1"],
-                    "no_math": False,
                 },
                 {
                     "id": "l02",
-                    "text": "Imagine applying a transformation to every vector in the coordinate plane. Most vectors will rotate and stretch away from their initial orientation.",
+                    "text": "When we apply a general matrix mapping to our coordinate grid, typical vectors rotate and tilt away from their initial orientations.",
                     "beat": "setup",
                     "cut": "both",
-                    "no_math": True,
                 },
                 {
                     "id": "l03",
-                    "text": "However along special lines through the origin vectors only get scaled by a numerical factor rather than knocked off their span completely.",
+                    "text": "Yet along rare directional axes passing through the origin, vectors experience pure uniform scaling without departing from their original span in any way.",
                     "beat": "build",
                     "cut": "both",
                     "no_math": True,
                 },
                 {
                     "id": "l04",
-                    "text": "This scaling factor is the eigenvalue of {{c1.value}} and the span that preserves direction is the eigenspace. Everything falls into place naturally.",
+                    "text": "The resulting expansion factor turns out to equal {{c1.value}}, while the preserved directional axis forms an invariant subspace.",
                     "beat": "aha",
                     "cut": "both",
                     "claims": ["c1"],
-                    "no_math": False,
                 },
                 {
                     "id": "l05",
-                    "text": "Mastering these invariant directions unlocks quantum mechanics data science and vibrational physics. Join us as we explore the geometric landscape.",
+                    "text": "Identifying these invariant pathways reveals the fundamental geometric structure powering quantum states, structural vibrations, and dimensional reduction across modern mathematical physics.",
                     "beat": "close",
                     "cut": "both",
-                    "no_math": True,
                 },
             ],
             "claim_specs": [
@@ -297,7 +297,11 @@ def run_smoke(
             resolved = resolve_placeholders(raw_text, facts, mode="spoken")
         except Exception as e:
             resolved = f"[Resolution Error: {e}] {raw_text}"
-        print(f"   [{line.get('id', '??'):<4}] ({line.get('beat', ''):<5}) {resolved}")
+        try:
+            print(f"   [{line.get('id', '??'):<4}] ({line.get('beat', ''):<5}) {resolved}")
+        except UnicodeEncodeError:
+            safe_resolved = resolved.encode("ascii", errors="replace").decode("ascii")
+            print(f"   [{line.get('id', '??'):<4}] ({line.get('beat', ''):<5}) {safe_resolved}")
 
     # Summary of artifacts
     print("\n" + "=" * 70)
@@ -316,6 +320,11 @@ def run_smoke(
 
 
 def main() -> None:
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     parser = argparse.ArgumentParser(description="Smoke test for Quantum8Lines agent stages.")
     parser.add_argument("--topic", type=str, default="Eigenvectors", help="Curriculum topic name")
     parser.add_argument(

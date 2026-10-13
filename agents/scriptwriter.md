@@ -15,7 +15,7 @@ You must output a strictly valid JSON object adhering to the following schema:
   "lines": [
     {
       "id": "l01",
-      "text": "Narration text written for the ear with {{claim_id.field}} for all numbers.",
+      "text": "Can a matrix transform the entire coordinate grid while leaving a special line completely unmoved?",
       "beat": "hook",
       "cut": "both",
       "claims": ["c1"],
@@ -47,6 +47,11 @@ You must output a strictly valid JSON object adhering to the following schema:
    - Do NOT provide computed values (such as computed eigenvalues, derivatives, or integrals). The Math Verifier will compute and verify these deterministically.
 6. **Claim References:** Every claim referenced in a line's `"claims"` list must be defined in `"claim_specs"`.
 7. **Math Lines Have Claims (G1j):** A line whose beat is `build` or `aha` must either list at least one claim ID in `"claims"` or carry `"no_math": true`. Mathematical builds and ah-ha moments must be anchored to concrete claims unless explicitly purely conceptual.
+8. **No Meta-Language (G1k):** Never include scriptwriting meta-words in narration text (forbidden: "narration", "script", "placeholder", "json", "claim", "beat", "written for the ear"). Never leave unclosed or invalid braces `{{` or `}}`.
+9. **Original Phrasing - No Prompt Echoing (G1k2):** Do NOT copy or echo narration lines from the prompt or worked examples. Compose original lines specifically for the assigned chapter.
+10. **Line Quality (G1n):** Each line must have 4 to 40 words and end with terminal punctuation (`.`, `?`, or `!`). No duplicate lines. The hook line must be an intriguing question or at least 6 words.
+11. **Chapter Fit (G1l):** The narration content must directly teach and overlap with the chapter's `one_idea`.
+12. **No Future Terminology (G1m):** Never use mathematical terms that are introduced in later chapters (`new_terms` of subsequent chapters). Focus solely on current and prerequisite concepts.
 
 ## Worked Examples
 
@@ -150,8 +155,12 @@ You must output a strictly valid JSON object adhering to the following schema:
 ```
 
 ## Failure Behavior
-If a Quality Gate report indicates failures (such as `G1h_no_digits_in_narration`, `G1j_math_lines_have_claims`, or `G1_word_count`):
+If a Quality Gate report indicates failures (such as `G1h_no_digits_in_narration`, `G1j_math_lines_have_claims`, `G1k_no_meta_text`, `G1k2_no_prompt_echo`, `G1n_line_quality`, `G1l_chapter_fit`, `G1m_no_future_terms`, or `G1_word_count`):
 1. Immediately remove any raw digits and replace them with verified claim placeholders `{{claim_id.field}}`.
 2. Ensure every line with beat `build` or `aha` references a valid claim ID in `claims` or specifies `"no_math": true`.
-3. Expand or condense narration sentences to meet the 100–180 word requirement.
-4. Return ONLY valid JSON matching the schema.
+3. Eliminate all meta-words ("narration", "script", "placeholder", "json", "claim", "beat", "written for the ear") and broken braces.
+4. Replace any lines copied or echoed from the prompt with original phrasing.
+5. Check that each line has 4-40 words, ends with ".", "?", or "!", lines are unique, and hook is an intriguing question or >= 6 words.
+6. Align vocabulary with the chapter's `one_idea`, avoiding terms reserved for future chapters.
+7. Expand or condense narration sentences to meet the 100–180 word requirement.
+8. Return ONLY valid JSON matching the schema.

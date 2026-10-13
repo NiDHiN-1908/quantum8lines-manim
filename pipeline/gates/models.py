@@ -57,6 +57,45 @@ class GateConfig(BaseModel):
     allowed_cuts: List[str] = Field(
         default_factory=lambda: ["both", "short", "long"]
     )
+
+    # G1 Quality Thresholds (M5a-quality)
+    banned_meta_words: List[str] = Field(
+        default_factory=lambda: [
+            "narration",
+            "script",
+            "placeholder",
+            "json",
+            "claim",
+            "beat",
+            "written for the ear",
+        ]
+    )
+    prompt_echo_ratio_threshold: float = 0.8
+    prompt_echo_ngram_len: int = 6
+    min_line_words: int = 4
+    max_line_words: int = 40
+    min_hook_words: int = 6
+    allowed_line_endings: List[str] = Field(
+        default_factory=lambda: [".", "?", "!"]
+    )
+    stopwords: List[str] = Field(
+        default_factory=lambda: [
+            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+            "of", "with", "is", "was", "are", "were", "be", "been", "being",
+            "it", "its", "this", "that", "these", "those", "from", "by", "as",
+            "into", "through", "about", "above", "after", "again", "all", "am",
+            "any", "before", "below", "between", "both", "can", "could", "did",
+            "do", "does", "doing", "down", "during", "each", "few", "further",
+            "had", "has", "have", "having", "he", "her", "here", "hers", "herself",
+            "him", "himself", "his", "how", "i", "if", "me", "more", "most", "my",
+            "myself", "no", "nor", "not", "off", "once", "only", "other", "ought",
+            "our", "ours", "ourselves", "out", "over", "own", "same", "she",
+            "should", "so", "some", "such", "than", "their", "theirs", "them",
+            "themselves", "then", "there", "they", "under", "until", "up", "very",
+            "we", "what", "when", "where", "which", "while", "who", "whom", "why",
+            "will", "would", "you", "your", "yours", "yourself", "yourselves",
+        ]
+    )
     # G5 Render Test Thresholds
     empty_frame_sample_sec: float = 0.5
     blank_pixel_diff_threshold: float = 0.002  # 0.2%

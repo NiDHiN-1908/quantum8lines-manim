@@ -3,34 +3,34 @@
   "lines": [
     {
       "id": "l01",
-      "text": "What if a matrix could transform space while keeping certain special directions completely unchanged? This is the central question of linear algebra.",
+      "text": "Can a linear transformation warp the entire coordinate plane while leaving certain geometric directions completely invariant across the space?",
       "beat": "hook",
       "cut": "both",
       "claims": ["c1"]
     },
     {
       "id": "l02",
-      "text": "Imagine applying a transformation to every vector in the coordinate plane. Most vectors will rotate and stretch away from their initial orientation.",
+      "text": "When we apply a general matrix mapping to our coordinate grid, typical vectors rotate and tilt away from their initial orientations.",
       "beat": "setup",
       "cut": "both"
     },
     {
       "id": "l03",
-      "text": "However, along special lines through the origin, vectors only get scaled by a numerical factor rather than knocked off their span.",
+      "text": "Yet along rare directional axes passing through the origin, vectors experience pure uniform scaling without departing from their original span in any way.",
       "beat": "build",
       "cut": "both",
       "no_math": true
     },
     {
       "id": "l04",
-      "text": "This scaling factor is the eigenvalue, and the span that preserves direction is the eigenspace. Everything falls into place naturally.",
+      "text": "This characteristic scaling factor represents the true scalar multiplier of the transformation, and every aligned trajectory defines an invariant directional line.",
       "beat": "aha",
       "cut": "both",
       "no_math": true
     },
     {
       "id": "l05",
-      "text": "Mastering these invariant directions unlocks quantum mechanics, data science, and vibrational physics. Join us as we explore the geometric landscape.",
+      "text": "Identifying these invariant pathways reveals the fundamental geometric structure powering quantum states, structural vibrations, and dimensional reduction across modern mathematical physics.",
       "beat": "close",
       "cut": "both"
     }

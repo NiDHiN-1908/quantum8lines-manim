@@ -300,3 +300,201 @@ def test_g1j_math_lines_have_claims_pass(clean_chapter_data):
     assert check is not None
     assert check.passed is True
 
+
+# ============================================================================
+# 3. M5a-Quality Seeded Error Tests (G1k, G1k2, G1n, G1l, G1m)
+# ============================================================================
+
+def test_g1k_exact_bad_hook_seeded_failure(clean_chapter_data):
+    """G1k failure: exact bad hook contains banned meta words ('written for the ear')."""
+    script = deepcopy(clean_chapter_data["script"])
+    script["lines"][0]["text"] = "Narration text written for the ear with two for all numbers."
+
+    res = run_g1_script(script_data=script, facts_data=clean_chapter_data["facts"])
+    assert res.passed is False
+    check = res.get_check("G1k_no_meta_text")
+    assert check is not None
+    assert check.passed is False
+    assert "written for the ear" in check.message.lower() or "narration" in check.message.lower()
+
+
+def test_g1k_no_meta_text_pass(clean_chapter_data):
+    """G1k pass: clean script contains no banned meta text or unresolved braces."""
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+    )
+    check = res.get_check("G1k_no_meta_text")
+    assert check is not None
+    assert check.passed is True
+
+
+def test_g1k2_prompt_echo_seeded_failure(clean_chapter_data):
+    """G1k2 failure: script line copies an example narration line from agents/scriptwriter.md."""
+    script = deepcopy(clean_chapter_data["script"])
+    # Copy exact line from scriptwriter.md schema example
+    script["lines"][0]["text"] = "Can a matrix transform the entire coordinate grid while leaving a special line completely unmoved?"
+
+    res = run_g1_script(script_data=script, facts_data=clean_chapter_data["facts"])
+    assert res.passed is False
+    check = res.get_check("G1k2_no_prompt_echo")
+    assert check is not None
+    assert check.passed is False
+    assert "echo" in check.message.lower()
+
+
+def test_g1k2_no_prompt_echo_pass(clean_chapter_data):
+    """G1k2 pass: clean script does not echo any prompt example lines."""
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+    )
+    check = res.get_check("G1k2_no_prompt_echo")
+    assert check is not None
+    assert check.passed is True
+
+
+def test_g1n_line_quality_too_short_failure(clean_chapter_data):
+    """G1n failure: a line has fewer than 4 words."""
+    script = deepcopy(clean_chapter_data["script"])
+    script["lines"][1]["text"] = "Too short."
+
+    res = run_g1_script(script_data=script, facts_data=clean_chapter_data["facts"])
+    assert res.passed is False
+    check = res.get_check("G1n_line_quality")
+    assert check is not None
+    assert check.passed is False
+    assert "word count" in check.message.lower() or "too short" in check.message.lower() or "words" in check.message.lower()
+
+
+def test_g1n_line_quality_no_punctuation_failure(clean_chapter_data):
+    """G1n failure: a line does not end with terminal punctuation (., ?, !)."""
+    script = deepcopy(clean_chapter_data["script"])
+    script["lines"][1]["text"] = "This line has no terminal punctuation at all"
+
+    res = run_g1_script(script_data=script, facts_data=clean_chapter_data["facts"])
+    assert res.passed is False
+    check = res.get_check("G1n_line_quality")
+    assert check is not None
+    assert check.passed is False
+    assert "must end with" in check.message.lower() or "punctuation" in check.message.lower()
+
+
+def test_g1n_line_quality_pass(clean_chapter_data):
+    """G1n pass: clean script lines meet length, punctuation, uniqueness, and hook requirements."""
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+    )
+    check = res.get_check("G1n_line_quality")
+    assert check is not None
+    assert check.passed is True
+
+
+def test_g1l_chapter_fit_seeded_failure(clean_chapter_data):
+    """G1l failure: script has no word overlap with chapter's one_idea."""
+    sample_chapter = {
+        "id": "ch01",
+        "title": "Quantum Mechanics",
+        "one_idea": "Superposition collapses upon measurement in Hilbert spaces",
+    }
+    sample_bible = {"chapters": [sample_chapter]}
+
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+        chapter_data=sample_chapter,
+        bible_data=sample_bible,
+    )
+    assert res.passed is False
+    check = res.get_check("G1l_chapter_fit")
+    assert check is not None
+    assert check.passed is False
+    assert "zero overlap" in check.message.lower()
+
+
+def test_g1l_chapter_fit_pass(clean_chapter_data):
+    """G1l pass: script overlaps with chapter's one_idea terms."""
+    sample_chapter = {
+        "id": "ch01",
+        "title": "Invariant Directions",
+        "one_idea": "Matrices can transform space while preserving special directions",
+    }
+    sample_bible = {"chapters": [sample_chapter]}
+
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+        chapter_data=sample_chapter,
+        bible_data=sample_bible,
+    )
+    check = res.get_check("G1l_chapter_fit")
+    assert check is not None
+    assert check.passed is True
+
+
+def test_g1m_no_future_terms_seeded_failure(clean_chapter_data):
+    """G1m failure: script uses a term introduced in a later chapter's new_terms."""
+    sample_bible = {
+        "chapters": [
+            {
+                "id": "ch01",
+                "title": "Invariant Directions",
+                "one_idea": "Matrices can transform space while preserving special directions",
+                "new_terms": ["transformation", "invariant direction"],
+            },
+            {
+                "id": "ch02",
+                "title": "Scaling Factors",
+                "one_idea": "Eigenvalues quantify stretching along invariant directions",
+                "new_terms": ["eigenvalue", "stretch factor"],
+            },
+        ]
+    }
+    script = deepcopy(clean_chapter_data["script"])
+    # Introduce "eigenvalue" into line 2
+    script["lines"][1]["text"] = "When a matrix acts on space, every eigenvalue reveals how arrows stretch."
+
+    res = run_g1_script(
+        script_data=script,
+        facts_data=clean_chapter_data["facts"],
+        chapter_data=sample_bible["chapters"][0],
+        bible_data=sample_bible,
+    )
+    assert res.passed is False
+    check = res.get_check("G1m_no_future_terms")
+    assert check is not None
+    assert check.passed is False
+    assert "eigenvalue" in check.message.lower()
+
+
+def test_g1m_no_future_terms_pass(clean_chapter_data):
+    """G1m pass: script does not use any terms reserved for later chapters."""
+    sample_bible = {
+        "chapters": [
+            {
+                "id": "ch01",
+                "title": "Invariant Directions",
+                "one_idea": "Matrices can transform space while preserving special directions",
+                "new_terms": ["transformation", "invariant direction"],
+            },
+            {
+                "id": "ch02",
+                "title": "Scaling Factors",
+                "one_idea": "Eigenvalues quantify stretching along invariant directions",
+                "new_terms": ["eigenvalue", "stretch factor"],
+            },
+        ]
+    }
+
+    res = run_g1_script(
+        script_data=clean_chapter_data["script"],
+        facts_data=clean_chapter_data["facts"],
+        chapter_data=sample_bible["chapters"][0],
+        bible_data=sample_bible,
+    )
+    check = res.get_check("G1m_no_future_terms")
+    assert check is not None
+    assert check.passed is True
+
+

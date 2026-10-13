@@ -157,7 +157,12 @@ def write_script(
         )
 
         last_script_dict = script_model.model_dump()
-        last_g1 = run_g1_script(chapter_dir=ch_path, script_data=last_script_dict)
+        last_g1 = run_g1_script(
+            chapter_dir=ch_path,
+            script_data=last_script_dict,
+            chapter_data=matched_ch.model_dump(),
+            bible_data=bible.model_dump(),
+        )
 
         if last_g1.passed:
             break
@@ -170,7 +175,12 @@ def write_script(
             "gate_feedback": (
                 f"[REGENERATION ATTEMPT {regen_idx} - Gate G1 failed]\n"
                 f"Failing checks:\n" + "\n".join(failing_checks) + "\n\n"
-                "Please fix these issues. Ensure all numbers use {{claim_id.field}} placeholders and word count is between 100 and 180 words."
+                "Please fix these issues:\n"
+                "- Replace raw digits with {{claim_id.field}} placeholders.\n"
+                "- Remove all meta-language ('narration', 'script', 'placeholder', 'json', 'claim', 'beat', 'written for the ear') and unclosed braces.\n"
+                "- Do NOT echo prompt examples; write original phrasing.\n"
+                "- Ensure every line ends with terminal punctuation ('.', '?', '!') and word count is between 100 and 180 words.\n"
+                "- Directly address the chapter's one_idea and do NOT use terms introduced in later chapters."
             ),
         }
 

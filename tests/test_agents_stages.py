@@ -23,25 +23,29 @@ CANNED_BIBLE = {
             "id": "ch01",
             "title": "Directions That Refuse to Turn",
             "one_idea": "Special vectors only scale along their original line without rotating.",
-            "question_it_raises": "How much do these invariant directions stretch?"
+            "question_it_raises": "How much do these invariant directions stretch?",
+            "new_terms": ["eigenvalue", "transformation", "vector", "scaling", "eigenspace"],
         },
         {
             "id": "ch02",
             "title": "The Scaling Factor",
             "one_idea": "The eigenvalue λ measures the exact scalar expansion along the eigenvector.",
-            "question_it_raises": "How do we find these values systematically?"
+            "question_it_raises": "How do we find these values systematically?",
+            "new_terms": ["characteristic polynomial", "trace"],
         },
         {
             "id": "ch03",
             "title": "The Characteristic Equation",
             "one_idea": "Eigenvalues satisfy the determinant equation det(A - λI) = 0.",
-            "question_it_raises": "What happens once the eigenvalues are known?"
+            "question_it_raises": "What happens once the eigenvalues are known?",
+            "new_terms": ["determinant", "characteristic equation"],
         },
         {
             "id": "ch04",
             "title": "The Full Eigenbasis",
             "one_idea": "Transforming into an eigenbasis uncouples complex dynamical systems.",
-            "question_it_raises": "Where does this geometric duality appear in modern physics?"
+            "question_it_raises": "Where does this geometric duality appear in modern physics?",
+            "new_terms": ["eigenbasis", "diagonalization"],
         }
     ],
     "prereqs": ["matrix multiplication", "determinants"],
@@ -50,42 +54,42 @@ CANNED_BIBLE = {
     "sources": ["Gilbert Strang, Linear Algebra"]
 }
 
-# 110-word clean script with canonical beats and {{c1.value}} placeholder
+# 102-word clean script with canonical beats and {{c1.value}} placeholder
 CANNED_VALID_SCRIPT = {
     "chapter": "ch01",
     "lines": [
         {
             "id": "l01",
-            "text": "What if a matrix could transform space while keeping certain special directions completely unchanged? This is the central question of linear algebra.",
+            "text": "Can a linear transformation warp the entire coordinate plane while leaving certain geometric directions completely invariant across the space?",
             "beat": "hook",
             "cut": "both",
-            "claims": ["c1"]
+            "claims": ["c1"],
         },
         {
             "id": "l02",
-            "text": "Imagine applying a transformation to every vector in the coordinate plane. Most vectors will rotate and stretch away from their initial orientation.",
+            "text": "When we apply a general matrix mapping to our coordinate grid, typical vectors rotate and tilt away from their initial orientations.",
             "beat": "setup",
-            "cut": "both"
+            "cut": "both",
         },
         {
             "id": "l03",
-            "text": "However along special lines through the origin vectors only get scaled by a numerical factor rather than knocked off their span completely.",
+            "text": "Yet along rare directional axes passing through the origin, vectors experience pure uniform scaling without departing from their original span in any way.",
             "beat": "build",
             "cut": "both",
             "no_math": True,
         },
         {
             "id": "l04",
-            "text": "This scaling factor is the eigenvalue of {{c1.value}} and the span that preserves direction is the eigenspace. Everything falls into place naturally.",
+            "text": "The resulting expansion factor turns out to equal {{c1.value}}, while the preserved directional axis forms an invariant subspace.",
             "beat": "aha",
             "cut": "both",
-            "claims": ["c1"]
+            "claims": ["c1"],
         },
         {
             "id": "l05",
-            "text": "Mastering these invariant directions unlocks quantum mechanics data science and vibrational physics. Join us as we explore the geometric landscape.",
+            "text": "Identifying these invariant pathways reveals the fundamental geometric structure powering quantum states, structural vibrations, and dimensional reduction across modern mathematical physics.",
             "beat": "close",
-            "cut": "both"
+            "cut": "both",
         }
     ],
     "claim_specs": [
@@ -168,7 +172,7 @@ def test_seeded_bad_script_triggers_regeneration_and_passes(tmp_path: Path):
     bad_script = dict(CANNED_VALID_SCRIPT)
     bad_script["lines"] = list(CANNED_VALID_SCRIPT["lines"])
     bad_line_4 = dict(bad_script["lines"][3])
-    bad_line_4["text"] = "This scaling factor is the eigenvalue of 2.7 and the span that preserves direction is the eigenspace. Everything falls into place naturally."
+    bad_line_4["text"] = "The resulting expansion factor turns out to equal 2.7, while the preserved directional axis forms an invariant subspace."
     bad_script["lines"][3] = bad_line_4
 
     # Script 2: Clean valid script passing G1
