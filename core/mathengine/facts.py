@@ -165,3 +165,62 @@ class Facts:
             sym_obj = sp.sympify(val)
 
         return sp.latex(sym_obj)
+
+    def spoken(self, key: str) -> str:
+        """
+        Return spoken English for the stored exact value or expression of a VERIFIED claim.
+        Supports integers, simple fractions, and simple powers.
+        Raises UnverifiedClaimError if the claim status is not 'verified'.
+        """
+        from core.mathengine.placeholders import to_spoken
+
+        val = None
+
+        # 1. Handle dot notation: e.g. "c1.value", "c1.eigenvalue"
+        if "." in key:
+            cid, attr = key.split(".", 1)
+            claim = self.get_claim(cid)
+            if claim.status != "verified":
+                raise UnverifiedClaimError(
+                    f"Cannot get spoken text for claim '{cid}': status is '{claim.status}'. "
+                    f"Reason: {claim.reason or 'Not verified by math engine'}"
+                )
+            if attr in claim.inputs:
+                val = claim.inputs[attr]
+            else:
+                val = getattr(claim, attr, None)
+
+        # 2. Key is a claim ID: e.g. "c1"
+        elif any(c.id == key for c in self.data.claims):
+            claim = self.get_claim(key)
+            if claim.status != "verified":
+                raise UnverifiedClaimError(
+                    f"Cannot get spoken text for claim '{key}': status is '{claim.status}'. "
+                    f"Reason: {claim.reason or 'Not verified by math engine'}"
+                )
+            for candidate in ("value", "result", "eigenvalue", "lambda", "derivative", "integral", "equation", "expr"):
+                if candidate in claim.inputs:
+                    val = claim.inputs[candidate]
+                    break
+            if val is None:
+                if len(claim.inputs) == 1:
+                    val = next(iter(claim.inputs.values()))
+                elif key in self.data.values:
+                    val = self.data.values[key]
+
+        # 3. Key is in self.data.values
+        elif key in self.data.values:
+            unverified = [c.id for c in self.data.claims if c.status != "verified"]
+            if unverified:
+                raise UnverifiedClaimError(
+                    f"Cannot get spoken text for value '{key}': unverified claims exist in Facts: {unverified}"
+                )
+            val = self.data.values[key]
+        else:
+            raise KeyError(f"Key '{key}' not found in Facts claims or values.")
+
+        if val is None:
+            raise ValueError(f"Could not resolve value for key '{key}'.")
+
+        return to_spoken(val)
+

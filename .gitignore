@@ -27,3 +27,9 @@ tests/fixtures/**/status.json
 tests/fixtures/**/report.json
 tests/fixtures/**/snapshots_*.json
 tests/fixtures/**/renders/
+
+# Environment & agent logs
+.env
+agent_logs/
+**/agent_logs/
+

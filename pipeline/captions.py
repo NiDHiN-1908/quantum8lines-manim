@@ -230,12 +230,31 @@ def generate_srt(
 def check_caption_text(
     script_input: Union[str, Path, Dict[str, Any]],
     captions_input: Union[str, Path],
+    facts_input: Optional[Union[str, Path, Any]] = None,
 ) -> Tuple[bool, str]:
     """
     Verifies that caption words match script words exactly (ignoring case and punctuation).
+    Resolves {{claim_id.field}} placeholders using facts if facts_input is provided.
     Returns (True, "OK") or (False, diff_description).
     """
     # 1. Extract script words
+    facts = None
+    if facts_input is not None:
+        try:
+            from core.mathengine.facts import Facts
+            facts = Facts.load(facts_input) if isinstance(facts_input, (str, Path)) else facts_input
+        except Exception:
+            facts = None
+    elif isinstance(script_input, (str, Path)):
+        p = Path(script_input)
+        candidate = p.parent / "facts.json" if p.is_file() else p / "facts.json"
+        if candidate.is_file():
+            try:
+                from core.mathengine.facts import Facts
+                facts = Facts.load(candidate)
+            except Exception:
+                facts = None
+
     if isinstance(script_input, dict):
         script_data = script_input
     elif Path(script_input).exists():
@@ -246,7 +265,16 @@ def check_caption_text(
 
     script_lines = script_data.get("lines", [])
     raw_script_text = " ".join([l.get("text", "") for l in script_lines])
+
+    if facts is not None:
+        try:
+            from core.mathengine.placeholders import resolve_placeholders
+            raw_script_text = resolve_placeholders(raw_script_text, facts, mode="spoken")
+        except Exception:
+            pass
+
     script_words = re.sub(r"[^\w\s]", "", raw_script_text).lower().split()
+
 
     # 2. Extract caption words
     if isinstance(captions_input, (str, Path)) and Path(captions_input).exists():

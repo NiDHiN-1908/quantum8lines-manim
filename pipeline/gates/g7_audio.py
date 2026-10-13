@@ -290,7 +290,12 @@ def run_g7_audio(
                 break
 
     if script_data is not None and captions_path is not None and Path(captions_path).exists():
-        cap_ok, cap_msg = check_caption_text(script_data, Path(captions_path))
+        facts_file = ch_path / "facts.json"
+        cap_ok, cap_msg = check_caption_text(
+            script_data,
+            Path(captions_path),
+            facts_input=facts_file if facts_file.is_file() else None,
+        )
         checks.append(
             Check(
                 id="G7c_caption_text",
@@ -300,6 +305,7 @@ def run_g7_audio(
                 details={"captions_path": str(captions_path)},
             )
         )
+
     else:
         checks.append(
             Check(

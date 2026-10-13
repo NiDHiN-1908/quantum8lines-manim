@@ -5,6 +5,7 @@ canonical beat progression, and claim references against facts.json.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -232,4 +233,65 @@ def run_g1_script(
         )
     )
 
+    # 9. No raw digits outside placeholders (G1h_no_digits_in_narration)
+    lines_with_digits = []
+    for line in lines:
+        lid = str(line.get("id", ""))
+        text = str(line.get("text", ""))
+        # Strip placeholders {{...}}
+        clean_text = re.sub(r"\{\{.*?\}\}", "", text)
+        digits_found = re.findall(r"\d+", clean_text)
+        if digits_found:
+            lines_with_digits.append({"line_id": lid, "digits": digits_found})
+
+    checks.append(
+        Check(
+            id="G1h_no_digits_in_narration",
+            passed=len(lines_with_digits) == 0,
+            severity="error",
+            message="No digits found in narration outside placeholders."
+            if len(lines_with_digits) == 0
+            else f"Digits found outside placeholders in line(s): {[x['line_id'] for x in lines_with_digits]}. Numbers must come from verified claims as {{{{claim_id.field}}}}.",
+            details={"lines_with_digits": lines_with_digits} if lines_with_digits else None,
+        )
+    )
+
+    # 10. Number words outside placeholders (G1i_number_words)
+    num_words_list = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+        "nineteen", "twenty", "hundred", "thousand", "half", "third", "quarter"
+    ]
+    num_pattern = re.compile(r"\b(" + "|".join(num_words_list) + r")\b", re.IGNORECASE)
+
+    lines_with_words = []
+    for line in lines:
+        lid = str(line.get("id", ""))
+        text = str(line.get("text", ""))
+        clean_text = re.sub(r"\{\{.*?\}\}", "", text)
+        words_found = num_pattern.findall(clean_text)
+        if words_found:
+            lines_with_words.append({"line_id": lid, "words": [w.lower() for w in words_found]})
+
+    if lines_with_words:
+        checks.append(
+            Check(
+                id="G1i_number_words",
+                passed=True,
+                severity="warning",
+                message=f"Number words outside placeholders detected in line(s) {[x['line_id'] for x in lines_with_words]}: {lines_with_words}. Review at G3.",
+                details={"lines_with_number_words": lines_with_words},
+            )
+        )
+    else:
+        checks.append(
+            Check(
+                id="G1i_number_words",
+                passed=True,
+                severity="error",
+                message="No number words detected in narration outside placeholders.",
+            )
+        )
+
     return GateResult.create("G1", checks)
+

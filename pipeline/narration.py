@@ -83,6 +83,16 @@ def build_narration(
         except Exception:
             checkpoints = {}
 
+    # Load facts if present for placeholder resolution
+    facts_path = chapter_path / "facts.json"
+    facts = None
+    if facts_path.is_file():
+        try:
+            from core.mathengine.facts import Facts
+            facts = Facts.load(facts_path)
+        except Exception:
+            facts = None
+
     lines = script_data.get("lines", [])
     line_timings: List[Dict[str, Any]] = []
     audio_chunks: List[np.ndarray] = []
@@ -94,8 +104,18 @@ def build_narration(
         raw_text = str(line.get("text", ""))
         beat = str(line.get("beat", "")).lower()
 
-        # Phonetic preparation (captions retain raw_text)
-        prepared_text = prepare_text(line, lexicon=profile.lexicon)
+        # Placeholder resolution (spoken mode) before lexicon
+        if facts is not None:
+            from core.mathengine.placeholders import resolve_placeholders
+            resolved_text = resolve_placeholders(raw_text, facts, mode="spoken")
+        else:
+            resolved_text = raw_text
+
+        # Phonetic preparation (applied after placeholder resolution)
+        line_to_prepare = dict(line)
+        line_to_prepare["text"] = resolved_text
+        prepared_text = prepare_text(line_to_prepare, lexicon=profile.lexicon)
+
 
         # Checkpointing
         line_hash = compute_line_hash(
