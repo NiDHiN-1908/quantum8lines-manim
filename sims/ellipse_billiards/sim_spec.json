@@ -1,0 +1,63 @@
+{
+  "title": "Where do they all meet?",
+  "counter_label": "Balls",
+  "ellipse": {
+    "a": 0.6,
+    "b": 0.8
+  },
+  "schedule": [
+    {
+      "count": 1,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 2,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 3,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 5,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 8,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 13,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 21,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 34,
+      "duration_sec": 3.5
+    },
+    {
+      "count": 55,
+      "duration_sec": 4.0
+    }
+  ],
+  "seed": 42,
+  "sound": {
+    "sample_rate": 48000,
+    "base_freq": 261.63,
+    "scale_semitones": [
+      0,
+      2,
+      4,
+      7,
+      9
+    ],
+    "ping_decay_sec": 0.08,
+    "chime_freq": 523.25,
+    "chime_decay_sec": 0.35,
+    "pad_enabled": true,
+    "pad_gain": 0.08
+  }
+}
