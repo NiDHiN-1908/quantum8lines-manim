@@ -207,17 +207,25 @@ def run_g1_script(
 
     missing_claim_ids = []
     if all_referenced_claims:
-        if facts_data is None:
-            missing_claim_ids = list(all_referenced_claims)
-        else:
-            existing_claim_ids = {
+        existing_claim_ids = set()
+        if facts_data is not None:
+            existing_claim_ids.update(
                 c.get("id")
                 for c in facts_data.get("claims", [])
                 if isinstance(c, dict) and "id" in c
-            }
-            for cid in all_referenced_claims:
-                if cid not in existing_claim_ids:
-                    missing_claim_ids.append(cid)
+            )
+        # Also check claim_specs proposed within script_data
+        claim_specs = script_data.get("claim_specs", [])
+        if isinstance(claim_specs, list):
+            for cs in claim_specs:
+                cid_val = cs.get("id") if isinstance(cs, dict) else getattr(cs, "id", None)
+                if cid_val:
+                    existing_claim_ids.add(cid_val)
+
+        for cid in all_referenced_claims:
+            if cid not in existing_claim_ids:
+                missing_claim_ids.append(cid)
+
 
     checks.append(
         Check(
