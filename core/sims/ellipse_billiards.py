@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 
+from core.sims.sound.models import SoundPaletteSpec
+
 
 class EventKind(str, Enum):
     LAUNCH = "launch"
@@ -90,6 +92,7 @@ class SimSpec(BaseModel):
     )
     seed: int = 42
     sound: SoundSettings = Field(default_factory=SoundSettings)
+    sound_palette: Optional["SoundPaletteSpec"] = None
 
     @property
     def total_duration(self) -> float:

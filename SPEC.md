@@ -403,6 +403,10 @@ Pages:
 | M5a | Agent framework | provider interface (Ollama, optional Gemini, mock), config file, schema validation with a retry loop, agent logs, placeholder resolution, Curriculum planner and Scriptwriter agents, the Math verifier stage; all tested offline with the mock provider; Ollama connectivity check |
 | M5b | Production agents | Storyboarder, Scene coder (with the G4/G5/G6 feedback loop, run in a subprocess with a timeout), Casting agent (needs M2.2), Publisher |
 | M5c | Orchestrator | one command runs a topic through all stages with checkpointing, stops at the human gates, and resumes; dry run on a stub topic with the mock provider |
+| P1 | Simulation prototype | ellipse billiards simulation short with procedural sound (done) |
+| P2a | Sound upgrade | sound palettes, scales, optional rhythm grid, reverb, polyphony control, Sound Lab page with blind scoring |
+| P2b | Simulation library | simulation type registry, simulation gates S1-S5, at least 3 more types, runner dispatch by format |
+| P2c | One platform | format-aware status, review UI and export for explainers and simulations (merged into M8) |
 | M6 | Pilot chapter | one chapter fully through all gates, both formats, approved by you |
 | M7 | Pilot topic | all chapters of the pilot topic + long video compile |
 | M8 | Review UI + publisher | UI covers all gates; publisher outputs titles/descriptions/thumbnail briefs |
@@ -522,3 +526,50 @@ Do not start a milestone before the previous one is done. Seeded-error tests in 
 ### 21.4 Free-tier and privacy notes
 - Cloud models send prompts to the provider's servers. Topics, scripts, and scene code are fine; nothing private is ever sent.
 - Check each provider's current free-tier limits and terms before batch runs; they change.
+
+---
+
+## 22. Content formats and the simulation library
+
+### 22.1 Formats
+- `explainer`: the narrated, chapter-wise format described in sections 1 to 14 (script, verified math, voice, captions, optional characters).
+- `simulation`: a "satisfying math" short. A question title, an escalating build, a visual payoff, procedural sound, no narration. Captions are optional.
+- `hybrid` (later): a simulation hook followed by a narrated explanation.
+- Every chapter in `bible.json` has a `format` field (default `explainer`). One topic can mix formats, for example a simulation short as the opener and explainer chapters that explain why it works.
+
+### 22.2 One platform
+- Both formats share the same topic folders, `bible.json`, `status.json`, layout engine and safe zones, tokens, fonts, intro and outro, exports, publisher, and review UI.
+- A single runner, `pipeline.run_chapter`, dispatches by `format` to its stage list. Explainer stages are in section 8. Simulation stages are `spec -> invariants -> render -> sound -> mix -> assemble -> export -> review`.
+- Gates still block. Human review (G3 plan, G8 final) applies to both formats.
+
+### 22.3 Simulation types
+- Each type lives in `core/sims/types/` and provides: pydantic parameters, a deterministic event generator (exact where possible, never loose time-stepping when a closed form exists), invariant checks that fail when the physics is perturbed, a drawing layer, a default sound mapping, and a default story template (title question, counter label, build schedule, payoff).
+- LLM agents choose a type and its parameters and write the title copy. They **never write physics or drawing code**.
+- Planned library (each needs invariant tests with a seeded failure): `ellipse_billiards` (done), `parabola_focus`, `pendulum_wave`, `lissajous` (frequency ratios are musical intervals), `pi_collisions`, `fourier_epicycles`, `golden_angle`, `cycloid_race`, `orbits`.
+
+### 22.4 Simulation gates
+| Gate | Checks |
+|---|---|
+| S1 spec | the spec validates against the type's schema |
+| S2 invariants | every invariant holds within tolerance (reflection law, conservation laws, exact counts, and so on) |
+| S3 text | title and counter inside the safe area, at least the minimum size, contrast of at least 4.5 |
+| S4 render | not blank, duration matches the spec |
+| S5 audio | integrated loudness within 1 LU of -14, true peak at or below -1.0 dBTP, no clipping |
+| G8 | human final review |
+
+### 22.5 Sound
+- Palettes (rendered in code, no external assets): `pluck` (Karplus-Strong), `marimba` (additive, inharmonic partials, fast decay), `bell` (FM), `glass`, and a quiet generated pad.
+- Scales: pentatonic, major, natural minor, whole-tone, lydian. Pitch comes from the event (ball id or height), never at random.
+- Optional rhythm grid: event times snap to a tempo grid by at most 30 ms so sound stays in sync with the picture. Off by default.
+- Polyphony limit and gain scaling so dense moments do not clip; algorithmic reverb; stereo pan from x position; final mastering with the existing `normalize` (-14 LUFS, true peak at or below -1.5 dBTP).
+- `sound_palette` lives in `sims/<id>/sim_spec.json`. A **Sound Lab** page works like the Voice Lab: the same simulation with each palette, blind scoring (pleasant 1-5, would keep watching yes/no), and an acceptance rule of at least 5 listeners, mean 4.0 or more, and 70% keep-watching.
+- Later option: a free SoundFont rendered through FluidSynth for realistic instruments. Record its license before use. Any music tracks need a license record in `brand/music/LICENSES.md`.
+
+### 22.6 Originality
+Do not copy another creator's video: title, layout, colors, or sound. A mathematical fact is free to use; the presentation must be ours (brand tokens, our wording, our sound).
+
+### 22.7 Open decisions
+- [ ] Which simulation types come first after `ellipse_billiards`
+- [ ] Approved sound palette for the first simulation short (chosen in the Sound Lab)
+- [ ] Whether to add SoundFont rendering (FluidSynth)
+- [ ] Whether simulation shorts get the brand intro sting, and how long

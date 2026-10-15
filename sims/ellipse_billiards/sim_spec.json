@@ -59,5 +59,20 @@
     "chime_decay_sec": 0.35,
     "pad_enabled": true,
     "pad_gain": 0.08
+  },
+  "sound_palette": {
+    "palette": "marimba",
+    "scale": "pentatonic_major",
+    "root": "C4",
+    "octaves": 3,
+    "tempo": 120.0,
+    "grid": false,
+    "grid_subdivision": 4,
+    "reverb_wet": 0.15,
+    "reverb_decay": 1.2,
+    "pad_enabled": true,
+    "pad_gain": 0.05,
+    "polyphony_limit": 24,
+    "seed": 42
   }
 }
