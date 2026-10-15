@@ -12,6 +12,10 @@ class SoundPaletteSpec(BaseModel):
     Configuration for procedural simulation sound.
     Validated by Pydantic with pleasant defaults.
     """
+    status: str = Field(
+        default="unapproved_default",
+        description="Approval status: unapproved_default | candidate | approved",
+    )
     palette: str = Field(
         default="marimba",
         description="Instrument timbre palette: pluck, marimba, bell, glass, legacy_ping",

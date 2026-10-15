@@ -61,6 +61,7 @@
     "pad_gain": 0.08
   },
   "sound_palette": {
+    "status": "unapproved_default",
     "palette": "marimba",
     "scale": "pentatonic_major",
     "root": "C4",
