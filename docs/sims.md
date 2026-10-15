@@ -47,7 +47,7 @@ Procedural simulation shorts generate mesmerizing, mathematically exact vertical
 
 ---
 
-## 2. Renderer Technology Choice: pycairo + NumPy vs. Manim
+### 2. Renderer Technology Choice: pycairo + NumPy vs. Manim
 
 For procedural physics simulations involving dozens of particles and fading trails at 30 fps, **`pycairo` with NumPy and FFmpeg direct piping** was chosen over Manim for the following reasons:
 
@@ -55,11 +55,11 @@ For procedural physics simulations involving dozens of particles and fading trai
    Manim is designed for declarative vector animations, allocating Python objects (`Circle`, `Line`, `VGroup`) for every element on every frame. When rendering 55 balls with 14-segment fading trails, Manim would manage over 800 mobjects per frame, incurring severe garbage collection overhead. Cairo draws directly to memory buffers with native C speed.
 2. **Direct Memory Mapping via FFmpeg Pipe:**
    Cairo's `ImageSurface(FORMAT_ARGB32)` stores pixels in native contiguous memory (`bgra` on little-endian x86/Windows). The runner streams `surface.get_data()` directly into FFmpeg's `stdin` via `-f rawvideo -pix_fmt bgra`, eliminating all disk I/O and frame PNG saving.
-3. **Hardware-Efficient Glow Effects:**
-   Instead of stacking hundreds of translucent Manim circles, the renderer extracts high-energy particle heads into a secondary array and applies `scipy.ndimage.gaussian_filter`. The blurred bloom is composited back onto the canvas with additive blending (`cairo.OPERATOR_ADD`), yielding high-end optical bloom with negligible CPU overhead.
-4. **Rendering Performance:**
-   - **Test Quality (270x480):** 32.0 seconds of video (960 frames) renders in **13.8 seconds** (~70 fps, faster than real-time).
-   - **Final Quality (1080x1920):** 32.0 seconds of video renders in **177 seconds** (~5.4 fps).
+3. **Static Architecture Caching & Half-Resolution Glow:**
+   The background radial vignette, faint glass fill, and static ellipse outline/foci are pre-rendered once into a cached static layer surface (`self.static_surface`), blitted in <1 ms per frame. The glow layer is processed at half resolution (540x960) with `scipy.ndimage.gaussian_filter`, achieving a 3x speedup.
+4. **Rendering Performance Comparison (Before vs. After Optimization):**
+   - **Video Render Time (1080x1920, 32.0s, 960 frames):** reduced from **235.92 s** to **81.32 s** (target <= 90s achieved).
+   - **Total Pipeline Time:** reduced from **248.12 s** to **93.06 s**.
 
 ---
 
@@ -93,57 +93,59 @@ All physical laws, differential equations, collision responses, and geometric so
 
 ---
 
-## 4. Procedural Audio Synthesis & Sound Upgrade (Milestone P2a)
+## 4. Procedural Audio Synthesis & Sound Polish (Milestone P2a.1)
 
 Audio is generated entirely algorithmically without external audio assets or samples:
 
 ### Timbre Palettes (`core/sims/sound/palettes.py`)
 1. **`pluck` (Karplus-Strong):**
-   Physical modeling of a plucked string using an excitation noise burst passed through a tuned delay-line IIR filter with lowpass averaging feedback.
+   Physical modeling of a plucked string with tuned delay-line IIR filter and a 3.5 ms shaped noise click transient for bright, tactile excitation.
 2. **`marimba` (Additive with Inharmonic Partials):**
-   Acoustic simulation of an undercut wooden xylophone bar. Modes at $1.0\times, 3.98\times$ (double octave), $9.25\times$, and $13.5\times$ with very fast decay of upper partials and a 1.5 ms soft mallet strike transient.
+   Acoustic simulation of an undercut wooden xylophone bar with partials at $1.0\times, 3.98\times, 9.25\times, 13.5\times$ and a short mallet attack click.
 3. **`bell` (FM Synthesis):**
    Chowning frequency modulation with an inharmonic modulation ratio ($1.414\times$) and decaying modulation index envelope.
 4. **`glass` (High Sine Cluster with Shimmer):**
-   High crystalline cluster of detuned sines ($1.000\times, 1.004\times, 1.503\times, 2.001\times, 2.752\times$) with a slow 4.0 Hz beating amplitude shimmer.
+   High crystalline cluster of detuned sines ($1.000\times, 1.004\times, 1.503\times, 2.001\times, 2.752\times$) with 4.0 Hz beating shimmer and tick transient.
 5. **`legacy_ping`:**
    Preserved legacy ping from Milestone P1 (sine wave with 2 ms attack and 0.08s exponential decay).
-6. **`pad` (Atmospheric Drone):**
-   Warm ambient pad chord (root, fifth, octave, and chorus beating) with a subtle 0.12 Hz tremolo and 1.5s fade in/out.
+6. **`pad` (Stage-Rising Atmospheric Drone):**
+   Warm ambient pad chord stepping upward through scale degrees across stages with smooth crossfades and subtle tremolo.
 
-### Scales and Deterministic Pitch Mapping (`core/sims/sound/scales.py`)
-- Standard 12-TET equal-temperament tuning: $f = f_{\text{root}} \cdot 2^{s/12}$.
-- Scales: `pentatonic_major`, `major`, `natural_minor`, `whole_tone`, `lydian`.
-- Pitch selection is strictly derived from the simulation event (`ball_id` or vertical height), **never at random**.
-
-### Rhythm Grid Quantization (`core/sims/sound/rhythm.py`)
-- Optional quantization to a musical tempo grid (tempo in BPM and beat subdivision).
-- Off by default. When enabled, event times are shifted by **at most 30 ms** to preserve synchronization with the visual physics.
-
-### Dynamics and Polyphony Management (`core/sims/sound/dynamics.py`)
-- **Polyphony Limit (default 24 voices):** When simultaneous active voices exceed the limit, the manager smoothly fades out and drops the oldest and quietest voice (5 ms click-free cosine fade).
-- **Energy Conservation Scaling:** Bounce amplitude scales dynamically by $\frac{1}{\sqrt{N}}$ where $N$ is the active ball count.
-- **Soft Saturation:** Tape-style non-linear saturation curve applied before mastering; completely linear below 0.65 amplitude, smoothly saturating with $\tanh$ above 0.65 to guarantee peak $\le 0.98$ without hard clipping.
-
-### Spatialization & Algorithmic Reverb (`core/sims/sound/space.py`)
-- **Stereo Panning:** Constant-power panning ($gl^2 + gr^2 = 1$) mapped from particle horizontal coordinate $x/a \in [-1, 1]$.
-- **Schroeder Algorithmic Reverb:** Pure NumPy/SciPy implementation with 4 parallel prime-delay feedback comb filters and 2 series allpass diffusion filters per channel, with channel delay offsets for stereo decorrelation.
+### Musical Mapping
+- **Arpeggiated First Bounces:** Across each stage, the first bounces of balls are sorted chronologically by wall collision time and assigned ascending scale degrees across the octave span, producing an upward arpeggio on each launch wave.
+- **F2 Convergence Chord & Visceral Low Thump:** When balls converge at focus $F_2$, a lush multi-voice chord (the active ball pitches) sounds simultaneously with a low-frequency sine sweep thump (80 Hz down to 40 Hz).
+- **Count-Increase Chime:** Each stage transition triggering an increased ball count sounds a bright rising two-note chime.
+- **Master High-Shelf EQ:** Master chain incorporates a gentle biquad IIR high-shelf boost (+3.0 dB above 3 kHz) for high presence and sparkle, ensuring the measured spectral centroid of the first 20s comfortably exceeds 1.5 kHz.
+- **Energy Conservation in Dense Moments:** Gain scales as $1/\sqrt{M}$ where $M$ is the number of simultaneous onsets within a 35 ms window, ensuring dense clusters (up to 55 balls) never clip.
 
 ---
 
-## 5. Objective Audition Report (Milestone P2a)
+## 5. Objective Audition Report (Milestone P2a.1)
 
-Rendered via `python -m pipeline.sound_audition sims/ellipse_billiards` across 7 presets on the first 12.0 seconds:
+Rendered via `python -m pipeline.sound_audition sims/ellipse_billiards` across all 10 presets for both key segments: `0-8s (early)` and `20-32s (dense)`:
 
-| Preset | Palette | Scale | Integrated (LUFS) | True Peak (dBTP) | LRA (LU) | Spectral Centroid (Hz) | Onsets / sec | Peak Polyphony |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pluck+pentatonic` | pluck | pentatonic_major | -15.17 | -1.50 | 4.80 | 575.5 | 1.92 | 6 |
-| `marimba+pentatonic` | marimba | pentatonic_major | -14.68 | -1.50 | 3.70 | 244.3 | 1.92 | 6 |
-| `bell+lydian` | bell | lydian | -14.43 | -2.02 | 2.10 | 408.0 | 1.92 | 6 |
-| `glass+whole-tone` | glass | whole_tone | -14.65 | -1.50 | 3.40 | 244.9 | 1.92 | 6 |
-| `marimba+minor with reverb` | marimba | natural_minor | -14.76 | -1.50 | 3.20 | 216.5 | 1.92 | 6 |
-| `pluck+major with grid quantization` | pluck | major | -15.14 | -1.50 | 4.40 | 560.4 | 1.92 | 6 |
-| `legacy_ping` | legacy_ping | pentatonic_major | -14.62 | -1.50 | 3.50 | 222.9 | 1.92 | 6 |
+| Preset | Segment | Palette | Scale | Integrated (LUFS) | True Peak (dBTP) | LRA (LU) | Spectral Centroid (Hz) | Onsets / sec | Peak Polyphony |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `pluck+pentatonic` | 0-8s (early) | pluck | pentatonic_major | -14.96 | -0.81 | 1.50 | 1032.2 | 2.12 | 6 |
+| `pluck+pentatonic` | 20-32s (dense) | pluck | pentatonic_major | -14.99 | -0.52 | 2.80 | 10095.1 | 28.58 | 24 |
+| `marimba+pentatonic` | 0-8s (early) | marimba | pentatonic_major | -14.10 | -1.50 | 0.50 | 614.7 | 2.12 | 6 |
+| `marimba+pentatonic` | 20-32s (dense) | marimba | pentatonic_major | -14.36 | -1.48 | 4.00 | 5322.9 | 28.58 | 24 |
+| `bell+lydian` | 0-8s (early) | bell | lydian | -14.00 | -1.98 | 2.00 | 959.0 | 2.12 | 6 |
+| `bell+lydian` | 20-32s (dense) | bell | lydian | -14.01 | -2.31 | 3.80 | 4522.0 | 28.58 | 24 |
+| `glass+whole-tone` | 0-8s (early) | glass | whole_tone | -14.15 | -1.50 | 0.60 | 600.1 | 2.12 | 6 |
+| `glass+whole-tone` | 20-32s (dense) | glass | whole_tone | -14.26 | -1.45 | 3.10 | 4222.9 | 28.58 | 24 |
+| `marimba+minor with reverb` | 0-8s (early) | marimba | natural_minor | -14.55 | -1.50 | 1.40 | 500.6 | 2.12 | 6 |
+| `marimba+minor with reverb` | 20-32s (dense) | marimba | natural_minor | -14.36 | -1.48 | 3.70 | 2878.4 | 28.58 | 24 |
+| `pluck+major with grid quantization` | 0-8s (early) | pluck | major | -14.94 | -0.68 | 1.30 | 952.0 | 2.12 | 6 |
+| `pluck+major with grid quantization` | 20-32s (dense) | pluck | major | -14.96 | -1.10 | 3.40 | 8007.1 | 28.58 | 24 |
+| `kalimba-like pluck with pentatonic` | 0-8s (early) | pluck | pentatonic_major | -14.97 | -0.76 | 1.40 | 1122.8 | 2.12 | 6 |
+| `kalimba-like pluck with pentatonic` | 20-32s (dense) | pluck | pentatonic_major | -15.24 | -0.46 | 3.10 | 9827.4 | 28.58 | 24 |
+| `glass+major with riser` | 0-8s (early) | glass | major | -14.30 | -1.50 | 0.90 | 594.5 | 2.12 | 6 |
+| `glass+major with riser` | 20-32s (dense) | glass | major | -14.38 | -1.48 | 3.40 | 3942.0 | 28.58 | 24 |
+| `pluck+lydian with chord payoff` | 0-8s (early) | pluck | lydian | -14.95 | -0.81 | 1.40 | 1009.2 | 2.12 | 6 |
+| `pluck+lydian with chord payoff` | 20-32s (dense) | pluck | lydian | -15.30 | -1.08 | 3.10 | 7836.2 | 28.58 | 24 |
+| `legacy_ping` | 0-8s (early) | legacy_ping | pentatonic_major | -14.26 | -1.50 | 1.20 | 278.9 | 2.12 | 6 |
+| `legacy_ping` | 20-32s (dense) | legacy_ping | pentatonic_major | -14.40 | -1.49 | 2.90 | 6047.8 | 28.58 | 24 |
 
 ---
 
@@ -152,41 +154,52 @@ Rendered via `python -m pipeline.sound_audition sims/ellipse_billiards` across 7
 Follows the Voice Lab pattern with pure business logic and Streamlit UI:
 - **Audition Mode:** Players with preset names visible and objective metrics displayed.
 - **Blind Evaluation Mode:** Anonymous shuffled labels (Preset A, Preset B, ...), 1-5 pleasantness rating, and "would keep watching" boolean.
-- **Acceptance Rule (SPEC Section 22.5):**
-  - Minimum listeners: **$\ge 5$**
-  - Mean pleasantness score: **$\ge 4.0$ / 5.0**
-  - Keep-watching percentage: **$\ge 70\%$**
-- **Approval & Assignment:** Approved presets can be assigned directly to `sims/<id>/sim_spec.json`, updating the `sound_palette` configuration block. Evaluator scores are persisted in `sims/<id>/sound_scores.json`.
+- **Strict Data Policy:** No human listener evaluations, ratings, or scores are invented. The Sound Lab creates `sound_scores.json` only when real human evaluators rate presets.
+- **Status Tracking:** Presets remain in `"unapproved_default"` or `"candidate"` until real human panels approve them.
 
 ---
 
-## 7. Safe Area and Layout Compliance
+## 7. Safe Area, Stage Fill (Gate S3b), and Layout Compliance
 
 The animation adheres strictly to the vertical layout standard `LAYOUT_916` defined in `core/layout.py`:
 - **Canvas:** 1080 x 1920 pixels (9:16 aspect ratio).
 - **Safe Margins:** Top 250 px, Bottom 480 px, Left/Right 90 px.
 - **Safe Box:** $X \in [90, 990]$, $Y \in [250, 1440]$.
 - **Title:** `"Where do they all meet?"` rendered at 60 px Inter Bold, centered horizontally at $X = 540$ px, $Y = 360$ px. Bounding box $X \in [165, 915]$, $Y \in [305, 360]$ (100% inside safe area).
-- **Counter:** `"Balls: <count>"` rendered at 48 px Inter Bold (meeting SPEC 4.3 label minimum 48 px), centered at $X = 540$ px, $Y = 430$ px. Bounding box $X \in [430, 650]$, $Y \in [390, 430]$ (100% inside safe area).
-- **Stage Area:** Ellipse semi-axes scaled to $R_x = 202.5$ px, $R_y = 270$ px, centered at $Y = 800$ px. Entire ellipse spans $Y \in [530, 1070]$ (completely clear of UI overlays).
+- **Counter:** `"Balls: <count>"` rendered at 48 px Inter Bold, centered at $X = 540$ px, $Y = 430$ px. Bounding box $X \in [430, 650]$, $Y \in [390, 430]$ (100% inside safe area).
+- **Stage Area & Gate S3b Fill:**
+  - Ellipse semi-axes scaled to fill 92% of stage region: $R_x = 223.56$ px, $R_y = 298.08$ px, centered at $Y = 800$ px.
+  - Bounding box covers $596.16$ px out of $648.0$ px stage height (**92.0% stage coverage**, comfortably exceeding Gate S3b minimum 85%).
+  - Outline: 5 px wide with neon glow in PRIMARY color (`#2E6B9E`).
+  - Foci: visible markers with F1 soft launch pulse and F2 expanding ring pulse at convergence.
+  - Balls: at least 14 px in diameter with blue-to-orange gradient by ball index and bright fading trails.
+- **Payoff Text:** Fades in during the last 4 seconds inside the caption region ($Y \approx 1250$ px, above bottom unsafe zone): `"Every ray from one focus passes through the other."` with a dark translucent backplate ensuring contrast ratio > 4.5:1.
 
 ---
 
-## 8. Final Render Verification (Milestone P2a)
+## 8. Final Render Verification (Milestone P2a.1)
 
-The ellipse billiards simulation short was rendered at final quality with the new default preset (`marimba+pentatonic`):
+The ellipse billiards simulation short was rendered at final quality (1080x1920 @ 30 fps) with the unapproved default palette:
 - **Output File:** `temp_renders/sim/ellipse_billiards_916_final.mp4`
 - **Resolution:** 1080 x 1920 (9:16)
-- **Duration:** 32.0 s (matches 32.0 s spec exactly)
-- **Integrated Loudness:** **-14.20 LUFS** (well within $\pm 1$ LU tolerance of -14.0 LUFS)
-- **True Peak:** **-1.38 dBTP** (compliant with $\le -1.0$ dBTP limit)
-- **Peak Sample:** 0.8475 (zero hard clipping, 0 consecutive full-scale sample runs)
+- **Duration:** 32.0 s (exact match with 32.0 s spec schedule)
+- **Integrated Loudness:** **-14.16 LUFS** (target: $-14.0 \pm 1.0$ LUFS)
+- **True Peak:** **-1.33 dBTP** (compliant with $\le -1.0$ dBTP limit)
+- **LRA:** 3.10 LU
+- **Sample Rate:** **48,000 Hz** stereo AAC @ 198.8 kbps (fixed from previous 96,000 Hz)
+- **Spectral Centroid (first 20s):** **1782.6 Hz** (exceeds > 1.5 kHz brightness threshold)
+- **Spectral Centroid (full 32s):** **2603.9 Hz**
+- **Peak Sample:** 0.8578 (zero clipping, 0 consecutive full-scale runs)
 - **Render Timings:**
   - Analytical Simulation: 0.005 s
-  - Fast Cairo Video Render: 235.92 s (~4.0 fps)
-  - Procedural Audio Build & Normalization: 10.63 s
-  - FFmpeg Audio/Video Muxing: 1.56 s
-  - Total Pipeline: 248.12 s
+  - Fast Cairo Video Render: **81.32 s** (~11.8 fps, 3x faster than previous 235.92 s)
+  - Procedural Audio Build & Normalization: 10.59 s
+  - FFmpeg Audio/Video Muxing: 1.14 s
+  - Total Pipeline: **93.06 s** (down from 248.12 s)
+- **Extracted Frames (`temp_renders/sim/frames_v2/`):**
+  - Early: `frame_early_03s.png` (t = 3.0s, 3 balls fanning out)
+  - Middle: `frame_middle_15s.png` (t = 15.0s, 13 balls converging)
+  - Late: `frame_late_30s.png` (t = 30.0s, 55 balls with payoff text)
 
 ---
 

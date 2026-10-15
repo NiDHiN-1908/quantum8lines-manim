@@ -228,7 +228,7 @@ def test_assign_palette_to_sim_writes_spec(tmp_path: Path):
     assert "sound_palette" in data
     assert data["sound_palette"]["palette"] == "marimba"
     assert data["sound_palette"]["scale"] == "pentatonic_major"
-    assert data["sound_palette"]["root"] == "C4"
+    assert data["sound_palette"]["root"] == "C5"
 
     # Assign with custom SoundPaletteSpec object
     custom_spec = SoundPaletteSpec(

@@ -101,3 +101,42 @@ def apply_schroeder_reverb(
     out_right = dry * right_in + wet * rev_r
 
     return np.column_stack([out_left, out_right]).astype(np.float32)
+
+
+def apply_high_shelf(
+    stereo_audio: np.ndarray,
+    sample_rate: int = 48000,
+    f0: float = 3000.0,
+    gain_db: float = 3.0,
+) -> np.ndarray:
+    """
+    Applies a gentle high-shelf EQ boost (+gain_db above f0) using Audio EQ Cookbook biquad IIR.
+    Lifts high-frequency sparkle and presence.
+    """
+    if abs(gain_db) < 0.05:
+        return stereo_audio
+
+    A = float(10.0 ** (gain_db / 40.0))
+    w0 = float(2.0 * math.pi * f0 / float(sample_rate))
+    cos_w0 = math.cos(w0)
+    sin_w0 = math.sin(w0)
+    alpha = (sin_w0 / 2.0) * math.sqrt(2.0)
+
+    b0 = A * ((A + 1.0) + (A - 1.0) * cos_w0 + 2.0 * math.sqrt(A) * alpha)
+    b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cos_w0)
+    b2 = A * ((A + 1.0) + (A - 1.0) * cos_w0 - 2.0 * math.sqrt(A) * alpha)
+    a0 = (A + 1.0) - (A - 1.0) * cos_w0 + 2.0 * math.sqrt(A) * alpha
+    a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cos_w0)
+    a2 = (A + 1.0) - (A - 1.0) * cos_w0 - 2.0 * math.sqrt(A) * alpha
+
+    b = np.array([b0, b1, b2], dtype=np.float64) / a0
+    a = np.array([a0, a1, a2], dtype=np.float64) / a0
+
+    out = np.empty_like(stereo_audio)
+    if stereo_audio.ndim == 1:
+        out = scipy.signal.lfilter(b, a, stereo_audio.astype(np.float64)).astype(np.float32)
+    else:
+        out[:, 0] = scipy.signal.lfilter(b, a, stereo_audio[:, 0].astype(np.float64)).astype(np.float32)
+        out[:, 1] = scipy.signal.lfilter(b, a, stereo_audio[:, 1].astype(np.float64)).astype(np.float32)
+
+    return out

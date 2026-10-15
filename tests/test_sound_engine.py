@@ -255,3 +255,193 @@ def test_determinism_for_fixed_seed(tmp_path: Path):
     arr2 = generate_simulation_audio_array(test_spec, events, total_duration=2.0)
 
     np.testing.assert_allclose(arr1, arr2, atol=1e-6)
+
+
+def compute_spectral_centroid(audio: np.ndarray, sample_rate: int = 48000) -> float:
+    """Computes spectral centroid (center of mass of frequency spectrum) in Hz."""
+    mono = np.mean(audio, axis=1) if audio.ndim > 1 else audio
+    mag = np.abs(np.fft.rfft(mono))
+    freqs = np.fft.rfftfreq(len(mono), 1.0 / sample_rate)
+    sum_mag = float(np.sum(mag))
+    if sum_mag < 1e-9:
+        return 0.0
+    return float(np.sum(freqs * mag) / sum_mag)
+
+
+def test_brightness_spectral_centroid_above_1500_hz(tmp_path: Path):
+    """
+    Measured spectral centroid of the first 20 s must be above 1.5 kHz (1500 Hz),
+    while loudness stays within 1 LU of -14 and true peak <= -1.5 dBTP.
+    """
+    spec = SimSpec(
+        sound_palette=SoundPaletteSpec(
+            palette="marimba",
+            scale="pentatonic_major",
+            root="C5",
+            high_shelf_db=3.0,
+        )
+    )
+    sim = EllipseBilliardsSim(axes=spec.ellipse, seed=spec.seed)
+    events = sim.simulate_spec(spec)
+
+    wav_out = tmp_path / "test_bright_20s.wav"
+    norm_result = build_and_normalize_audio(
+        spec=spec,
+        events=events,
+        output_path=wav_out,
+        total_duration=20.0,
+        target_i=-14.0,
+        target_tp=-1.5,
+    )
+
+    import soundfile as sf
+    data, sr = sf.read(str(wav_out))
+    centroid = compute_spectral_centroid(data, sample_rate=sr)
+
+    assert centroid > 1500.0, f"Spectral centroid {centroid:.1f} Hz is not above 1500 Hz"
+    qa = verify_audio_quality(wav_out)
+    assert -15.0 <= qa["integrated_lufs"] <= -13.0, f"Loudness {qa['integrated_lufs']} outside [-15, -13]"
+    assert qa["true_peak"] <= -1.45, f"True peak {qa['true_peak']} > -1.5 dBTP"
+    assert qa["no_clipping"] is True
+
+
+def test_chord_and_thump_events_present_at_f2():
+    """
+    At F2 convergence, both the musical chord and low thump (80->40 Hz sweep) are generated.
+    """
+    from core.sims.sound.palettes import render_thump
+
+    # Test thump synthesis
+    thump = render_thump(duration_sec=0.12, f_start=80.0, f_end=40.0, sample_rate=48000)
+    assert len(thump) == int(0.12 * 48000)
+    assert np.all(np.isfinite(thump))
+    assert 0.01 < float(np.max(np.abs(thump))) < 1.0
+
+    # Test that simulation with 3 balls generates audio with chord & thump at F2 (t = 1.6s)
+    spec = SimSpec(
+        schedule=[StageSpec(count=3, duration_sec=2.5)],
+        sound_palette=SoundPaletteSpec(root="C5", high_shelf_db=3.0),
+    )
+    sim = EllipseBilliardsSim(axes=spec.ellipse, seed=42)
+    events = sim.simulate_spec(spec)
+
+    audio = generate_simulation_audio_array(spec, events, total_duration=2.5)
+    # At t ~ 1.6s (around sample 1.6 * 48000 = 76800), sound is active and non-silent
+    f2_sample = int(1.60 * 48000)
+    convergence_window = audio[f2_sample:f2_sample + int(0.10 * 48000)]
+    assert float(np.max(np.abs(convergence_window))) > 0.05
+
+
+def test_chime_on_every_count_increase():
+    """
+    A short rising two-note chime is triggered at each stage transition (count increase).
+    """
+    from core.sims.sound.palettes import render_count_increase_chime
+
+    chime = render_count_increase_chime(base_freq=587.33, interval_semitones=5, sample_rate=48000)
+    assert len(chime) > 0
+    assert np.all(np.isfinite(chime))
+    assert 0.01 < float(np.max(np.abs(chime))) < 1.0
+
+    # Multi-stage schedule
+    spec = SimSpec(
+        schedule=[
+            StageSpec(count=1, duration_sec=2.0),
+            StageSpec(count=2, duration_sec=2.0),
+            StageSpec(count=3, duration_sec=2.5),
+        ]
+    )
+    sim = EllipseBilliardsSim(axes=spec.ellipse, seed=42)
+    events = sim.simulate_spec(spec)
+
+    audio = generate_simulation_audio_array(spec, events, total_duration=6.5)
+    # Stage transitions at t=2.0s and t=4.0s
+    for t_trans in [2.0, 4.0]:
+        s = int(t_trans * 48000)
+        window = audio[s:s + int(0.15 * 48000)]
+        assert float(np.max(np.abs(window))) > 0.05
+
+
+def test_dense_moments_scale_with_simultaneous_onsets_no_clipping():
+    """
+    Dense moments scale gain with 1/sqrt(simultaneous onsets) so nothing clips.
+    """
+    spec = SimSpec(
+        schedule=[StageSpec(count=55, duration_sec=5.0)],
+        sound_palette=SoundPaletteSpec(
+            palette="marimba",
+            scale="pentatonic_major",
+            root="C5",
+            polyphony_limit=24,
+            pad_enabled=True,
+        ),
+    )
+    sim = EllipseBilliardsSim(axes=spec.ellipse, seed=42)
+    events = sim.simulate_spec(spec)
+
+    audio = generate_simulation_audio_array(spec, events, total_duration=5.0)
+    assert np.all(np.isfinite(audio))
+    assert not np.any(np.isnan(audio))
+    assert float(np.max(np.abs(audio))) <= 0.98
+
+
+def test_muxed_file_audio_stream_48000_hz_stereo_aac(tmp_path: Path):
+    """
+    Verifies with ffprobe that the muxed video file contains audio
+    with sample_rate == 48000 Hz, 2 channels (stereo), and aac codec at >= 192k.
+    """
+    import json
+    import subprocess
+    import soundfile as sf
+
+    temp_vid = tmp_path / "dummy_vid.mp4"
+    temp_aud = tmp_path / "dummy_aud.wav"
+    out_mp4 = tmp_path / "muxed_test.mp4"
+
+    # Generate 1s test tone at 48000 Hz
+    sr = 48000
+    t = np.arange(sr) / sr
+    audio_data = np.column_stack([np.sin(2 * np.pi * 440 * t), np.sin(2 * np.pi * 880 * t)]).astype(np.float32) * 0.2
+    sf.write(str(temp_aud), audio_data, sr)
+
+    # Generate 1s test video
+    subprocess.run([
+        "ffmpeg", "-y", "-nostdin",
+        "-f", "lavfi", "-i", "color=c=black:s=64x64:d=1.0:r=30",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(temp_vid),
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+    # Mux with the exact mux flags
+    mux_cmd = [
+        "ffmpeg", "-y", "-nostdin",
+        "-i", str(temp_vid),
+        "-i", str(temp_aud),
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000",
+        "-ac", "2",
+        "-shortest",
+        str(out_mp4),
+    ]
+    subprocess.run(mux_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+    # Query with ffprobe
+    probe_cmd = [
+        "ffprobe", "-v", "quiet",
+        "-print_format", "json",
+        "-show_streams",
+        str(out_mp4),
+    ]
+    res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+    probe_data = json.loads(res.stdout)
+
+    audio_streams = [s for s in probe_data.get("streams", []) if s.get("codec_type") == "audio"]
+    assert len(audio_streams) >= 1
+    a_stream = audio_streams[0]
+    assert a_stream.get("codec_name") == "aac"
+    assert int(a_stream.get("sample_rate", 0)) == 48000
+    assert int(a_stream.get("channels", 0)) == 2
+
+

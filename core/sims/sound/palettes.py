@@ -5,9 +5,30 @@ Follows SPEC.md Section 22.5 and Milestone P2a.
 """
 
 import math
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 import scipy.signal
+
+
+def _add_tick_transient(
+    signal: np.ndarray,
+    sample_rate: int,
+    seed: int = 42,
+    tick_dur_ms: float = 3.0,
+    tick_amp: float = 0.18,
+) -> np.ndarray:
+    """Adds a short shaped noise click transient at the attack for crisp tactile brightness."""
+    num_samples = int(round(tick_dur_ms * 0.001 * sample_rate))
+    if num_samples <= 0 or len(signal) < num_samples:
+        return signal
+
+    rng = np.random.RandomState((int(seed) * 41 + 107) & 0xFFFFFFFF)
+    noise = rng.uniform(-1.0, 1.0, size=num_samples).astype(np.float32)
+    # High-pass / differentiator for bright click
+    noise = np.diff(noise, prepend=0.0).astype(np.float32)
+    env = np.exp(-np.linspace(0, 5.0, num_samples)).astype(np.float32)
+    signal[:num_samples] += noise * env * tick_amp
+    return signal
 
 
 def render_pluck(
@@ -18,7 +39,8 @@ def render_pluck(
     seed: int = 42,
 ) -> np.ndarray:
     """
-    Synthesizes a plucked string note using the Karplus-Strong physical modeling algorithm.
+    Synthesizes a plucked string note using the Karplus-Strong physical modeling algorithm
+    with short noise tick transient.
     Finite, non-silent, no NaN, peak strictly below 1.0.
     """
     pitch_hz = max(20.0, min(pitch_hz, sample_rate * 0.45))
@@ -46,6 +68,9 @@ def render_pluck(
 
     y = scipy.signal.lfilter(b, a, x).astype(np.float32)
 
+    # Add short noise tick transient for crisp attack
+    y = _add_tick_transient(y, sample_rate, seed=note_seed, tick_dur_ms=3.5, tick_amp=0.22)
+
     # Fade out last 3ms to avoid end click
     fade_len = int(min(0.005 * sample_rate, num_samples // 4))
     if fade_len > 0:
@@ -70,7 +95,7 @@ def render_marimba(
 ) -> np.ndarray:
     """
     Synthesizes a warm marimba/wooden bar note using additive synthesis
-    with inharmonic flexural modes and rapid decay of upper partials.
+    with inharmonic flexural modes, rapid decay of upper partials, and short noise tick transient.
     """
     pitch_hz = max(20.0, min(pitch_hz, sample_rate * 0.45))
     num_samples = int(math.ceil(duration_sec * sample_rate))
@@ -94,6 +119,11 @@ def render_marimba(
             continue
         env = np.exp(-t / decay).astype(np.float32)
         signal += (amp * np.sin(2.0 * np.pi * f * t).astype(np.float32)) * env
+
+    # Add short noise tick transient for tactile mallet attack
+    signal = _add_tick_transient(
+        signal, sample_rate, seed=int(seed) * 19 + int(round(pitch_hz * 7)), tick_dur_ms=3.0, tick_amp=0.20
+    )
 
     # Smooth 1.5ms cosine attack ramp
     attack_samples = int(0.0015 * sample_rate)
@@ -158,7 +188,8 @@ def render_glass(
     seed: int = 42,
 ) -> np.ndarray:
     """
-    Synthesizes a crystalline glass tone: high sine cluster with slow shimmer beating.
+    Synthesizes a crystalline glass tone: high sine cluster with slow shimmer beating
+    and short high-frequency tick transient.
     """
     pitch_hz = max(40.0, min(pitch_hz, sample_rate * 0.45))
     num_samples = int(math.ceil(duration_sec * sample_rate))
@@ -182,6 +213,11 @@ def render_glass(
             continue
         env = np.exp(-t / decay).astype(np.float32)
         signal += (amp * np.sin(2.0 * np.pi * f * t).astype(np.float32)) * env
+
+    # Add short noise tick transient for crystalline strike
+    signal = _add_tick_transient(
+        signal, sample_rate, seed=int(seed) * 23 + int(round(pitch_hz * 5)), tick_dur_ms=2.5, tick_amp=0.16
+    )
 
     # Slow shimmer tremolo (4.0 Hz)
     shimmer = (1.0 + 0.15 * np.sin(2.0 * np.pi * 4.0 * t)).astype(np.float32)
@@ -253,26 +289,116 @@ def render_chime(
     return (signal * 0.6).astype(np.float32)
 
 
+def render_thump(
+    duration_sec: float = 0.12,
+    f_start: float = 80.0,
+    f_end: float = 40.0,
+    sample_rate: int = 48000,
+    amplitude: float = 0.40,
+) -> np.ndarray:
+    """
+    Synthesizes a short low-frequency thump: sine sweep from 80 Hz down to 40 Hz.
+    Used at focal convergence for visceral physical weight.
+    """
+    num_samples = int(math.ceil(duration_sec * sample_rate))
+    t = np.arange(num_samples, dtype=np.float32) / float(sample_rate)
+
+    # Linear frequency sweep: f(t) = f_start + (f_end - f_start) * (t / duration_sec)
+    # Phase phi(t) = 2*pi * (f_start * t + 0.5 * (f_end - f_start) / duration_sec * t^2)
+    phi = 2.0 * np.pi * (f_start * t + 0.5 * (f_end - f_start) / max(1e-4, duration_sec) * (t**2))
+    sine = np.sin(phi).astype(np.float32)
+
+    # Rapid attack (2ms), exponential decay
+    attack_samples = int(0.002 * sample_rate)
+    env = np.ones(num_samples, dtype=np.float32)
+    if attack_samples > 0:
+        env[:attack_samples] = 0.5 * (1.0 - np.cos(np.pi * np.arange(attack_samples) / attack_samples))
+    if num_samples > attack_samples:
+        decay_samples = num_samples - attack_samples
+        env[attack_samples:] = np.exp(-np.linspace(0, 4.0, decay_samples)).astype(np.float32)
+
+    signal = sine * env * amplitude
+    return signal.astype(np.float32)
+
+
+def render_count_increase_chime(
+    base_freq: float = 587.33,  # D5
+    interval_semitones: int = 5,  # Rising fourth/fifth
+    note_dur: float = 0.12,
+    sample_rate: int = 48000,
+    amplitude: float = 0.30,
+) -> np.ndarray:
+    """
+    Synthesizes a short rising two-note chime for count increase stage transitions.
+    """
+    n1_freq = base_freq
+    n2_freq = base_freq * (2.0 ** (interval_semitones / 12.0))
+
+    c1 = render_chime(base_freq=n1_freq, duration_sec=note_dur * 1.5, sample_rate=sample_rate, decay_sec=0.10)
+    c2 = render_chime(base_freq=n2_freq, duration_sec=note_dur * 2.0, sample_rate=sample_rate, decay_sec=0.15)
+
+    offset_samples = int(note_dur * 0.7 * sample_rate)
+    total_len = offset_samples + len(c2)
+    sig = np.zeros(total_len, dtype=np.float32)
+    sig[:len(c1)] += c1 * amplitude
+    sig[offset_samples:offset_samples + len(c2)] += c2 * (amplitude * 1.1)
+
+    return sig.astype(np.float32)
+
+
 def render_pad(
     total_duration_sec: float,
     sample_rate: int = 48000,
     gain: float = 0.05,
     root_freq: float = 130.81,
+    stages: Optional[List[Tuple[float, float, int]]] = None,
+    scale_semitones: Optional[List[int]] = None,
 ) -> np.ndarray:
     """
     Synthesizes a quiet, warm generated ambient pad chord under the simulation.
+    If stages and scale_semitones are provided, the pad pitch subtly steps upward
+    with each stage progression.
     Returns stereo array shape (num_samples, 2).
     """
     num_samples = int(math.ceil(total_duration_sec * sample_rate))
     t = np.arange(num_samples, dtype=np.float32) / float(sample_rate)
 
-    # Chord over root: Root + Fifth (1.5x) + Octave (2.0x) with detuning
-    drone = (
-        0.50 * np.sin(2.0 * np.pi * root_freq * t)
-        + 0.30 * np.sin(2.0 * np.pi * (root_freq * 1.498) * t + 0.5)
-        + 0.20 * np.sin(2.0 * np.pi * (root_freq * 2.001) * t + 1.0)
-        + 0.15 * np.sin(2.0 * np.pi * (root_freq + 0.3) * t)  # slow chorus beating
-    ).astype(np.float32)
+    if not stages or not scale_semitones:
+        # Static ambient pad chord over root
+        drone = (
+            0.50 * np.sin(2.0 * np.pi * root_freq * t)
+            + 0.30 * np.sin(2.0 * np.pi * (root_freq * 1.498) * t + 0.5)
+            + 0.20 * np.sin(2.0 * np.pi * (root_freq * 2.001) * t + 1.0)
+            + 0.15 * np.sin(2.0 * np.pi * (root_freq + 0.3) * t)
+        ).astype(np.float32)
+    else:
+        # Dynamic stage-rising pad chord
+        drone = np.zeros(num_samples, dtype=np.float32)
+        scale_len = len(scale_semitones)
+        for t0, t1, s_idx in stages:
+            s_start = int(max(0, math.floor(t0 * sample_rate)))
+            s_end = int(min(num_samples, math.ceil(t1 * sample_rate)))
+            if s_end <= s_start:
+                continue
+
+            semi = scale_semitones[s_idx % scale_len] + 12 * (s_idx // scale_len)
+            f_stage = root_freq * (2.0 ** (semi / 12.0))
+            t_seg = t[s_start:s_end]
+
+            seg_drone = (
+                0.50 * np.sin(2.0 * np.pi * f_stage * t_seg)
+                + 0.30 * np.sin(2.0 * np.pi * (f_stage * 1.498) * t_seg + 0.5)
+                + 0.20 * np.sin(2.0 * np.pi * (f_stage * 2.001) * t_seg + 1.0)
+                + 0.15 * np.sin(2.0 * np.pi * (f_stage + 0.3) * t_seg)
+            ).astype(np.float32)
+
+            # Smooth 0.25s crossfade ramp at boundaries
+            ramp_len = int(min(0.25 * sample_rate, len(seg_drone) // 4))
+            if ramp_len > 0 and s_idx > 0:
+                ramp_in = 0.5 * (1.0 - np.cos(np.pi * np.arange(ramp_len) / ramp_len))
+                seg_drone[:ramp_len] *= ramp_in.astype(np.float32)
+
+            drone[s_start:s_end] += seg_drone
 
     # Subtle 0.1 Hz tremolo
     tremolo = (0.85 + 0.15 * np.sin(2.0 * np.pi * 0.12 * t)).astype(np.float32)

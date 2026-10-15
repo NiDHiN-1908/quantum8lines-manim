@@ -79,17 +79,18 @@ class SimSpec(BaseModel):
     ellipse: EllipseAxes = Field(default_factory=EllipseAxes)
     schedule: List[StageSpec] = Field(
         default_factory=lambda: [
-            StageSpec(count=1, duration_sec=3.5),
-            StageSpec(count=2, duration_sec=3.5),
-            StageSpec(count=3, duration_sec=3.5),
-            StageSpec(count=5, duration_sec=3.5),
+            StageSpec(count=1, duration_sec=2.0),
+            StageSpec(count=2, duration_sec=2.0),
+            StageSpec(count=3, duration_sec=2.5),
+            StageSpec(count=5, duration_sec=3.0),
             StageSpec(count=8, duration_sec=3.5),
-            StageSpec(count=13, duration_sec=3.5),
-            StageSpec(count=21, duration_sec=3.5),
-            StageSpec(count=34, duration_sec=3.5),
-            StageSpec(count=55, duration_sec=4.0),
+            StageSpec(count=13, duration_sec=4.0),
+            StageSpec(count=21, duration_sec=4.5),
+            StageSpec(count=34, duration_sec=5.0),
+            StageSpec(count=55, duration_sec=5.5),
         ]
     )
+    payoff_text: Optional[str] = "Every ray from one focus passes through the other."
     seed: int = 42
     sound: SoundSettings = Field(default_factory=SoundSettings)
     sound_palette: Optional["SoundPaletteSpec"] = None

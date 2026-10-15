@@ -26,12 +26,14 @@ from core.sims.sound.palettes import (
     PALETTE_RENDERERS,
     render_bell,
     render_chime,
+    render_count_increase_chime,
     render_glass,
     render_legacy_ping,
     render_marimba,
     render_note,
     render_pad,
     render_pluck,
+    render_thump,
 )
 from core.sims.sound.rhythm import (
     MAX_QUANTIZE_SHIFT_SEC,
@@ -46,6 +48,7 @@ from core.sims.sound.scales import (
     parse_root_hz,
 )
 from core.sims.sound.space import (
+    apply_high_shelf,
     apply_schroeder_reverb,
     compute_stereo_gains,
 )
@@ -125,7 +128,9 @@ __all__ = [
     "render_glass",
     "render_legacy_ping",
     "render_chime",
+    "render_count_increase_chime",
     "render_pad",
+    "render_thump",
     # Scales
     "SCALES",
     "NOTE_SEMITONES",
@@ -139,6 +144,7 @@ __all__ = [
     # Space
     "compute_stereo_gains",
     "apply_schroeder_reverb",
+    "apply_high_shelf",
     # Dynamics
     "ActiveVoice",
     "PolyphonyManager",

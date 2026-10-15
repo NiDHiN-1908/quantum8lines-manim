@@ -160,6 +160,8 @@ def run_sim_pipeline(
         "-c:v", "copy",
         "-c:a", "aac",
         "-b:a", "192k",
+        "-ar", "48000",
+        "-ac", "2",
         "-shortest",
         str(final_mp4),
     ]

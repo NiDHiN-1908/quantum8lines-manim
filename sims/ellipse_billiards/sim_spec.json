@@ -8,19 +8,19 @@
   "schedule": [
     {
       "count": 1,
-      "duration_sec": 3.5
+      "duration_sec": 2.0
     },
     {
       "count": 2,
-      "duration_sec": 3.5
+      "duration_sec": 2.0
     },
     {
       "count": 3,
-      "duration_sec": 3.5
+      "duration_sec": 2.5
     },
     {
       "count": 5,
-      "duration_sec": 3.5
+      "duration_sec": 3.0
     },
     {
       "count": 8,
@@ -28,21 +28,22 @@
     },
     {
       "count": 13,
-      "duration_sec": 3.5
+      "duration_sec": 4.0
     },
     {
       "count": 21,
-      "duration_sec": 3.5
+      "duration_sec": 4.5
     },
     {
       "count": 34,
-      "duration_sec": 3.5
+      "duration_sec": 5.0
     },
     {
       "count": 55,
-      "duration_sec": 4.0
+      "duration_sec": 5.5
     }
   ],
+  "payoff_text": "Every ray from one focus passes through the other.",
   "seed": 42,
   "sound": {
     "sample_rate": 48000,

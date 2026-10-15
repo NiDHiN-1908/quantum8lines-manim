@@ -19,12 +19,14 @@ from core.sims.sound.dynamics import PolyphonyManager, apply_soft_saturation
 from core.sims.sound.models import PRESET_CONFIGS, SoundPaletteSpec
 from core.sims.sound.palettes import (
     render_chime,
+    render_count_increase_chime,
     render_note,
     render_pad,
+    render_thump,
 )
 from core.sims.sound.rhythm import quantize_events
-from core.sims.sound.scales import event_to_pitch, parse_root_hz
-from core.sims.sound.space import apply_schroeder_reverb, compute_stereo_gains
+from core.sims.sound.scales import SCALES, event_to_pitch, get_note_frequency, parse_root_hz
+from core.sims.sound.space import apply_high_shelf, apply_schroeder_reverb, compute_stereo_gains
 
 
 def generate_simulation_audio_array(
@@ -36,7 +38,8 @@ def generate_simulation_audio_array(
     """
     Synthesizes raw stereo procedural audio array from simulation events.
     Applies palette timbres, scales, optional rhythm quantization, polyphony limiting,
-    Schroeder algorithmic reverb, and soft saturation.
+    musical arpeggiation, focal convergence chords with low thump, count-increase chimes,
+    Schroeder algorithmic reverb, master high-shelf EQ, and soft saturation.
     """
     # Resolve sound palette config
     if isinstance(palette_override, str):
@@ -53,7 +56,7 @@ def generate_simulation_audio_array(
             palette_spec = SoundPaletteSpec(
                 palette="marimba",
                 scale="pentatonic_major",
-                root="C4",
+                root="C5",
                 pad_enabled=getattr(spec.sound, "pad_enabled", True),
                 pad_gain=getattr(spec.sound, "pad_gain", 0.05),
             )
@@ -77,7 +80,7 @@ def generate_simulation_audio_array(
     # 2. Parse root pitch
     root_hz = parse_root_hz(palette_spec.root)
 
-    # 3. Pre-index stage timing for dynamic 1/sqrt(N) gain scaling
+    # 3. Pre-index stage timing
     stages_timing: List[Tuple[float, float, int]] = []
     if hasattr(spec, "schedule"):
         cum_t = 0.0
@@ -85,20 +88,77 @@ def generate_simulation_audio_array(
             stages_timing.append((cum_t, cum_t + s.duration_sec, s.count))
             cum_t += s.duration_sec
 
-    def get_stage_count(t_event: float) -> int:
-        for t0, t1, count in stages_timing:
+    def get_stage_info(t_event: float) -> Tuple[int, int]:
+        """Returns (stage_index, stage_ball_count)."""
+        for idx, (t0, t1, count) in enumerate(stages_timing):
             if t0 <= t_event < t1:
-                return count
-        return stages_timing[-1][2] if stages_timing else 1
+                return idx, count
+        if stages_timing:
+            return len(stages_timing) - 1, stages_timing[-1][2]
+        return 0, 1
 
-    # 4. Prepare voice events for polyphony manager
+    # 4. Map first bounces of each stage to arpeggiate upward across ball indices
+    ball_pitch_ranks: Dict[Tuple[int, int], int] = {}
+    stage_ball_pitches: Dict[int, List[float]] = {}
+
+    for s_idx, (t0, t1, count) in enumerate(stages_timing):
+        stage_bounces = [
+            e for e in active_events
+            if t0 <= e.time < t1 and "bounce" in str(getattr(e, "kind", "")).lower()
+        ]
+        earliest_per_ball: Dict[int, float] = {}
+        for b in stage_bounces:
+            b_id = getattr(b, "ball_id", 0)
+            if b_id not in earliest_per_ball or b.time < earliest_per_ball[b_id]:
+                earliest_per_ball[b_id] = b.time
+
+        sorted_balls = sorted(earliest_per_ball.keys(), key=lambda b_id: (earliest_per_ball[b_id], b_id))
+        for rank, b_id in enumerate(sorted_balls):
+            ball_pitch_ranks[(s_idx, b_id)] = rank
+
+        # Precalculate stage ball pitches
+        pitches = []
+        for rank in range(count):
+            f = get_note_frequency(rank, root_hz=root_hz, scale_name=palette_spec.scale, octaves=palette_spec.octaves)
+            pitches.append(f)
+        stage_ball_pitches[s_idx] = pitches
+
+    # 5. Pre-collect bounce timestamps for 1/sqrt(simultaneous onsets) energy scaling
+    bounce_times = np.array([
+        e.time for e in active_events if "bounce" in str(getattr(e, "kind", "")).lower()
+    ], dtype=np.float64)
+
+    # 6. Prepare voice events for polyphony manager
     # List of (start_sample, end_sample, left_sig, right_sig, base_amp, decay_samples)
     voice_events: List[Tuple[int, int, np.ndarray, np.ndarray, float, int]] = []
-    last_chime_time = -1.0
     semi_a = getattr(getattr(spec, "ellipse", None), "a", 0.6)
 
-    # Cached notes to minimize re-synthesis overhead for identical pitches
+    # Count increase chimes on stage transitions (stage_idx >= 1)
+    for s_idx in range(1, len(stages_timing)):
+        t_stage_start = stages_timing[s_idx][0]
+        if t_stage_start < dur:
+            start_s = int(round(t_stage_start * sr))
+            chime_sig = render_count_increase_chime(
+                base_freq=root_hz * 1.5,
+                interval_semitones=5,
+                note_dur=0.10,
+                sample_rate=sr,
+                amplitude=0.30,
+            )
+            left_ch = chime_sig * 0.90
+            right_ch = chime_sig * 0.90
+            voice_events.append((
+                start_s,
+                start_s + len(chime_sig),
+                left_ch,
+                right_ch,
+                0.30,
+                int(0.20 * sr),
+            ))
+
+    # Note cache to minimize re-synthesis overhead
     note_cache: Dict[Tuple[int, float], np.ndarray] = {}
+    last_f2_time = -1.0
 
     for evt in active_events:
         if evt.time >= dur:
@@ -109,11 +169,15 @@ def generate_simulation_audio_array(
             continue
 
         kind_str = str(getattr(evt, "kind", "")).lower()
-        # Check for bounce event (Enum or string)
         if "bounce" in kind_str:
-            count = get_stage_count(evt.time)
-            # Energy conservation scaling 1 / sqrt(N)
-            gain_scale = 1.0 / math.sqrt(max(1.0, float(count)))
+            s_idx, count = get_stage_info(evt.time)
+
+            # Energy conservation: gain per onset scales with 1 / sqrt(simultaneous onsets)
+            if len(bounce_times) > 0:
+                simul_onsets = int(np.sum(np.abs(bounce_times - evt.time) <= 0.035))
+            else:
+                simul_onsets = 1
+            gain_scale = 1.0 / math.sqrt(max(1.0, float(simul_onsets)))
 
             # Event velocity
             v_mag = 1.0
@@ -122,8 +186,11 @@ def generate_simulation_audio_array(
                 v_mag = math.sqrt(vx * vx + vy * vy)
             amp = 0.40 * gain_scale * max(0.2, min(1.2, v_mag))
 
-            pitch_hz = event_to_pitch(
-                evt,
+            # Arpeggiated pitch mapping
+            b_id = getattr(evt, "ball_id", 0)
+            pitch_rank = ball_pitch_ranks.get((s_idx, b_id), b_id)
+            pitch_hz = get_note_frequency(
+                pitch_rank,
                 root_hz=root_hz,
                 scale_name=palette_spec.scale,
                 octaves=palette_spec.octaves,
@@ -154,34 +221,74 @@ def generate_simulation_audio_array(
             voice_events.append((start_idx, end_idx, left_sig, right_sig, amp, decay_samples))
 
         elif "pass_focus" in kind_str:
-            # Trigger exactly ONE chime per focal convergence instant
-            if abs(evt.time - last_chime_time) > 0.08:
-                last_chime_time = evt.time
-                chime_hz = root_hz * 2.0  # Octave above root
-                chime_sig = render_chime(
-                    base_freq=chime_hz,
-                    duration_sec=0.6,
-                    sample_rate=sr,
-                    decay_sec=0.35,
-                )
-                amp_chime = 0.35
-                left_chime = chime_sig * amp_chime
-                right_chime = chime_sig * amp_chime
-                end_idx = start_idx + len(chime_sig)
-                decay_samples = int(0.35 * sr)
-                voice_events.append((start_idx, end_idx, left_chime, right_chime, amp_chime, decay_samples))
+            # Trigger chord and low thump at F2 convergence instant
+            if abs(evt.time - last_f2_time) > 0.08:
+                last_f2_time = evt.time
+                s_idx, _ = get_stage_info(evt.time)
+                stage_pitches = stage_ball_pitches.get(s_idx, [root_hz * 2.0])
 
-    # 5. Polyphony management and buffer allocation
+                # Voice the chord: up to 6 distinct tones across the ball pitches
+                if len(stage_pitches) <= 6:
+                    chord_freqs = stage_pitches
+                else:
+                    chord_indices = [int(round(i * (len(stage_pitches) - 1) / 5.0)) for i in range(6)]
+                    chord_freqs = list(dict.fromkeys(stage_pitches[i] for i in chord_indices))
+
+                chord_amp = 0.32 / math.sqrt(max(1.0, float(len(chord_freqs))))
+                for f_note in chord_freqs:
+                    chime_note = render_chime(
+                        base_freq=f_note,
+                        duration_sec=0.55,
+                        sample_rate=sr,
+                        decay_sec=0.30,
+                    )
+                    end_chime = start_idx + len(chime_note)
+                    voice_events.append((
+                        start_idx,
+                        end_chime,
+                        chime_note * chord_amp,
+                        chime_note * chord_amp,
+                        chord_amp,
+                        int(0.30 * sr),
+                    ))
+
+                # Visceral low thump (sine sweep 80 Hz -> 40 Hz)
+                thump_sig = render_thump(
+                    duration_sec=0.12,
+                    f_start=80.0,
+                    f_end=40.0,
+                    sample_rate=sr,
+                    amplitude=0.42,
+                )
+                end_thump = start_idx + len(thump_sig)
+                voice_events.append((
+                    start_idx,
+                    end_thump,
+                    thump_sig * 0.95,
+                    thump_sig * 0.95,
+                    0.42,
+                    int(0.08 * sr),
+                ))
+
+    # 7. Polyphony management and buffer allocation
     poly_mgr = PolyphonyManager(polyphony_limit=palette_spec.polyphony_limit, sample_rate=sr)
     stereo_buffer = poly_mgr.allocate_voices(voice_events, total_samples)
 
-    # 6. Ambient pad layer
+    # 8. Ambient pad layer (with optional stage-rising pitch)
     if palette_spec.pad_enabled:
-        pad = render_pad(dur, sample_rate=sr, gain=palette_spec.pad_gain, root_freq=root_hz / 2.0)
+        scale_semitones = SCALES.get(palette_spec.scale, [0, 2, 4, 7, 9])
+        pad = render_pad(
+            dur,
+            sample_rate=sr,
+            gain=palette_spec.pad_gain,
+            root_freq=root_hz / 2.0,
+            stages=stages_timing if palette_spec.pad_riser else None,
+            scale_semitones=scale_semitones,
+        )
         pad_len = min(len(pad), total_samples)
         stereo_buffer[:pad_len] += pad[:pad_len]
 
-    # 7. Schroeder algorithmic reverb
+    # 9. Schroeder algorithmic reverb
     if palette_spec.reverb_wet > 1e-4:
         stereo_buffer = apply_schroeder_reverb(
             stereo_buffer,
@@ -190,7 +297,16 @@ def generate_simulation_audio_array(
             decay_sec=palette_spec.reverb_decay,
         )
 
-    # 8. Soft saturation at the end
+    # 10. Master high-shelf EQ boost (+3 dB above 3 kHz) for bright presence
+    if palette_spec.high_shelf_db > 0.05:
+        stereo_buffer = apply_high_shelf(
+            stereo_buffer,
+            sample_rate=sr,
+            f0=3000.0,
+            gain_db=palette_spec.high_shelf_db,
+        )
+
+    # 11. Soft tape-style saturation to prevent clipping
     stereo_buffer = apply_soft_saturation(stereo_buffer)
 
     return stereo_buffer.astype(np.float32)

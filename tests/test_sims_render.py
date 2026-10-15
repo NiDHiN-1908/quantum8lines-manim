@@ -11,6 +11,7 @@ import pytest
 from core.sims.ellipse_billiards import SimSpec
 from core.sims.render import (
     QUALITY_PRESETS,
+    check_s3b_stage_fill,
     get_text_bounding_boxes,
     is_bbox_inside_safe,
     render_simulation_video,
@@ -78,3 +79,29 @@ def test_short_render_non_blank_and_correct_duration(tmp_path: Path):
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     assert frame_png.is_file()
     assert frame_png.stat().st_size > 500
+
+
+def test_s3b_stage_fill_and_seeded_failure():
+    """
+    Gate S3b stage fill verification:
+    - Normal spec covers >= 85% of stage region dimension (about 92%)
+    - Deliberately small ellipse seeded failure fails the check
+    """
+    spec = SimSpec()
+
+    # Normal spec check (should pass with ~92% coverage)
+    res = check_s3b_stage_fill(spec, quality="final")
+    assert res["passed"] is True
+    assert res["stage_fill_ratio"] >= 0.85
+    assert abs(res["stage_fill_ratio"] - 0.92) < 0.01
+
+    # Also test at test quality
+    res_test = check_s3b_stage_fill(spec, quality="test")
+    assert res_test["passed"] is True
+    assert res_test["stage_fill_ratio"] >= 0.85
+
+    # Seeded failure: deliberately small ellipse scale
+    small_res = check_s3b_stage_fill(spec, quality="final", sim_scale_override=150.0)
+    assert small_res["passed"] is False
+    assert small_res["stage_fill_ratio"] < 0.85
+    assert small_res["stage_fill_ratio"] < 0.50

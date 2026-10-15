@@ -138,9 +138,11 @@ def normalize(
 
     cmd = ["ffmpeg", "-y", "-nostdin", "-i", str(p_in)]
     if is_video and is_video_out:
-        cmd.extend(["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"])
+        cmd.extend(["-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"])
     elif p_out.suffix.lower() == ".wav":
-        cmd.extend(["-c:a", "pcm_s16le"])
+        cmd.extend(["-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2"])
+    else:
+        cmd.extend(["-ar", "48000", "-ac", "2"])
 
     cmd.extend(["-af", af_chain, str(p_out)])
 

@@ -35,37 +35,52 @@ from core.sims.sound import (
 from pipeline.audio_fx import measure_loudness
 
 
-# 7 Standard audition presets
+# 10 Standard and Bright Audition presets
 AUDITION_PRESETS: List[Tuple[str, str, SoundPaletteSpec]] = [
     (
         "pluck+pentatonic",
-        "pluck+pentatonic",
+        "pluck_pentatonic",
         PRESET_CONFIGS["pluck+pentatonic"],
     ),
     (
         "marimba+pentatonic",
-        "marimba+pentatonic",
+        "marimba_pentatonic",
         PRESET_CONFIGS["marimba+pentatonic"],
     ),
     (
         "bell+lydian",
-        "bell+lydian",
+        "bell_lydian",
         PRESET_CONFIGS["bell+lydian"],
     ),
     (
         "glass+whole-tone",
-        "glass+whole-tone",
+        "glass_whole_tone",
         PRESET_CONFIGS["glass+whole-tone"],
     ),
     (
         "marimba+minor with reverb",
-        "marimba+minor_reverb",
+        "marimba_minor_reverb",
         PRESET_CONFIGS["marimba+minor with reverb"],
     ),
     (
         "pluck+major with grid quantization",
-        "pluck+major_grid",
+        "pluck_major_grid",
         PRESET_CONFIGS["pluck+major with grid quantization"],
+    ),
+    (
+        "kalimba-like pluck with pentatonic",
+        "kalimba_pluck_pentatonic",
+        PRESET_CONFIGS["kalimba-like pluck with pentatonic"],
+    ),
+    (
+        "glass+major with riser",
+        "glass_major_riser",
+        PRESET_CONFIGS["glass+major with riser"],
+    ),
+    (
+        "pluck+lydian with chord payoff",
+        "pluck_lydian_chord",
+        PRESET_CONFIGS["pluck+lydian with chord payoff"],
     ),
     (
         "legacy_ping",
@@ -84,7 +99,6 @@ def compute_spectral_centroid(wav_path: Union[str, Path]) -> float:
     if samples.ndim > 1:
         samples = np.mean(samples, axis=1)
 
-    # Compute STFT spectrogram
     nperseg = min(2048, len(samples))
     if nperseg < 64:
         return 0.0
@@ -95,7 +109,6 @@ def compute_spectral_centroid(wav_path: Union[str, Path]) -> float:
     if max_energy <= 1e-9:
         return 0.0
 
-    # Only include active frames (energy > 0.1% of max energy)
     active_mask = frame_energy > 0.001 * max_energy
     if not np.any(active_mask):
         active_mask = np.ones(sxx.shape[1], dtype=bool)
@@ -109,33 +122,32 @@ def compute_spectral_centroid(wav_path: Union[str, Path]) -> float:
 
 def compute_peak_polyphony(
     events: List[SimEvent],
-    dur: float,
+    t_start: float,
+    t_end: float,
     sr: int = 48000,
     note_dur_sec: float = 0.40,
     polyphony_limit: int = 24,
 ) -> int:
     """
-    Calculates the maximum concurrent voices sounding at any point in the simulation,
+    Calculates the maximum concurrent voices sounding within [t_start, t_end],
     capped by the polyphony limit.
     """
-    # Create intervals of sounding notes
     intervals: List[Tuple[float, float]] = []
     for evt in events:
-        if evt.time >= dur:
+        if evt.time < t_start or evt.time >= t_end:
             continue
         kind_str = str(evt.kind).lower()
         if "bounce" in kind_str or "pass_focus" in kind_str:
             d = 0.60 if "pass_focus" in kind_str else note_dur_sec
-            intervals.append((evt.time, min(dur, evt.time + d)))
+            intervals.append((evt.time, min(t_end, evt.time + d)))
 
     if not intervals:
         return 0
 
-    # Sweep-line algorithm to find maximum overlapping intervals
     point_events: List[Tuple[float, int]] = []
-    for t_start, t_end in intervals:
-        point_events.append((t_start, 1))   # voice onset
-        point_events.append((t_end, -1))    # voice release
+    for s, e in intervals:
+        point_events.append((s, 1))
+        point_events.append((e, -1))
 
     point_events.sort(key=lambda x: (x[0], -x[1]))
 
@@ -151,12 +163,13 @@ def compute_peak_polyphony(
 
 def run_sound_audition(
     sim_dir: Union[str, Path] = "sims/ellipse_billiards",
-    duration_sec: float = 12.0,
     output_dir: Union[str, Path] = "build/sound_audition",
 ) -> Dict[str, Any]:
     """
-    Renders audition audio clips for all candidate sound presets over the first duration_sec
-    of the simulation. Computes objective metrics and outputs build/sound_audition/manifest.json.
+    Renders audition audio clips for all candidate sound presets across two key segments:
+    - seconds 0-8 (early / sparse arpeggiations)
+    - seconds 20-32 (dense last 12 seconds with high collision rate)
+    Computes objective metrics and outputs build/sound_audition/manifest.json.
     """
     s_dir = Path(sim_dir).resolve()
     spec_path = s_dir / "sim_spec.json"
@@ -173,94 +186,126 @@ def run_sound_audition(
     # Deterministic physics simulation
     sim = EllipseBilliardsSim(axes=sim_spec.ellipse, seed=sim_spec.seed)
     full_events = sim.simulate_spec(sim_spec)
-    audition_events = [e for e in full_events if e.time < duration_sec]
+    total_dur = sim_spec.total_duration
 
-    # Count bounce onsets in 12s
-    bounce_events = [e for e in audition_events if "bounce" in str(e.kind).lower()]
-    onsets_per_sec = round(len(bounce_events) / float(duration_sec), 2)
+    segments = [
+        ("0-8s (early)", 0.0, 8.0, "0_8s"),
+        ("20-32s (dense)", max(0.0, total_dur - 12.0), total_dur, "20_32s"),
+    ]
 
+    sr = getattr(getattr(sim_spec, "sound", None), "sample_rate", 48000)
     results: List[Dict[str, Any]] = []
 
     print(f"\n=========================================================================")
-    print(f" procedural sound audition: {s_dir.name} ({duration_sec:.1f}s)")
+    print(f" procedural sound audition: {s_dir.name} (10 presets x 2 segments)")
     print(f"=========================================================================\n")
 
+    from core.sims.sound.engine import generate_simulation_audio_array
+    from pipeline.audio_fx import normalize
+
     for preset_label, file_slug, palette_spec in AUDITION_PRESETS:
-        wav_filename = f"{file_slug}.wav"
-        wav_path = out_dir / wav_filename
+        print(f"\n--- Preset: {preset_label} ---")
 
-        print(f"Rendering preset: {preset_label} -> {wav_filename} ...", end=" ", flush=True)
-
-        # Apply grid quantization if preset enables it
-        events_for_preset = audition_events
+        events_for_preset = full_events
         if palette_spec.grid:
             events_for_preset = quantize_events(
-                audition_events,
+                full_events,
                 enabled=True,
                 tempo=palette_spec.tempo,
                 subdivision=palette_spec.grid_subdivision,
             )
 
-        # Build and normalize
-        build_and_normalize_audio(
+        # Synthesize full duration raw array once
+        full_audio = generate_simulation_audio_array(
             spec=sim_spec,
             events=events_for_preset,
-            output_path=wav_path,
-            total_duration=duration_sec,
-            target_i=-14.0,
-            target_tp=-1.5,
+            total_duration=total_dur,
             palette_override=palette_spec,
         )
 
-        # Measure objective metrics
-        loudness_meas = measure_loudness(wav_path)
-        centroid = compute_spectral_centroid(wav_path)
-        note_dur = 0.15 if palette_spec.palette == "legacy_ping" else 0.40
-        peak_poly = compute_peak_polyphony(
-            events_for_preset,
-            dur=duration_sec,
-            note_dur_sec=note_dur,
-            polyphony_limit=palette_spec.polyphony_limit,
-        )
+        for seg_name, t_start, t_end, seg_slug in segments:
+            seg_dur = t_end - t_start
+            s_start = int(round(t_start * sr))
+            s_end = int(round(t_end * sr))
+            seg_samples = full_audio[s_start:s_end]
 
-        entry = {
-            "preset": preset_label,
-            "slug": file_slug,
-            "palette": palette_spec.palette,
-            "scale": palette_spec.scale,
-            "root": str(palette_spec.root),
-            "reverb_wet": palette_spec.reverb_wet,
-            "reverb_decay": palette_spec.reverb_decay,
-            "grid": palette_spec.grid,
-            "pad_enabled": palette_spec.pad_enabled,
-            "wav_path": str(wav_path.relative_to(Path.cwd()) if wav_path.is_relative_to(Path.cwd()) else wav_path),
-            "integrated_lufs": round(loudness_meas["integrated_lufs"], 2),
-            "true_peak": round(loudness_meas["true_peak"], 2),
-            "lra": round(loudness_meas.get("lra", 0.0), 2),
-            "spectral_centroid_hz": round(centroid, 1),
-            "onsets_per_sec": onsets_per_sec,
-            "peak_polyphony": peak_poly,
-        }
-        results.append(entry)
-        print(f"done! (I: {entry['integrated_lufs']} LUFS, TP: {entry['true_peak']} dBTP, Centroid: {entry['spectral_centroid_hz']} Hz)")
+            wav_filename = f"{file_slug}_{seg_slug}.wav"
+            wav_path = out_dir / wav_filename
+            temp_raw = out_dir / f"_temp_raw_{wav_filename}"
+
+            # Write raw segment and normalize
+            sf.write(str(temp_raw), seg_samples, sr, subtype="PCM_24")
+            try:
+                normalize(
+                    path_in=temp_raw,
+                    path_out=wav_path,
+                    target_i=-14.0,
+                    target_tp=-1.5,
+                )
+            finally:
+                temp_raw.unlink(missing_ok=True)
+
+            # Measure metrics
+            loudness_meas = measure_loudness(wav_path)
+            centroid = compute_spectral_centroid(wav_path)
+
+            seg_bounces = [
+                e for e in events_for_preset
+                if t_start <= e.time < t_end and "bounce" in str(e.kind).lower()
+            ]
+            onsets_per_sec = round(len(seg_bounces) / float(seg_dur), 2)
+
+            note_dur = 0.15 if palette_spec.palette == "legacy_ping" else 0.40
+            peak_poly = compute_peak_polyphony(
+                events_for_preset,
+                t_start=t_start,
+                t_end=t_end,
+                sr=sr,
+                note_dur_sec=note_dur,
+                polyphony_limit=palette_spec.polyphony_limit,
+            )
+
+            entry = {
+                "preset": preset_label,
+                "segment": seg_name,
+                "slug": f"{file_slug}_{seg_slug}",
+                "palette": palette_spec.palette,
+                "scale": palette_spec.scale,
+                "root": str(palette_spec.root),
+                "reverb_wet": palette_spec.reverb_wet,
+                "reverb_decay": palette_spec.reverb_decay,
+                "grid": palette_spec.grid,
+                "pad_enabled": palette_spec.pad_enabled,
+                "wav_path": str(wav_path.relative_to(Path.cwd()) if wav_path.is_relative_to(Path.cwd()) else wav_path),
+                "integrated_lufs": round(loudness_meas["integrated_lufs"], 2),
+                "true_peak": round(loudness_meas["true_peak"], 2),
+                "lra": round(loudness_meas.get("lra", 0.0), 2),
+                "spectral_centroid_hz": round(centroid, 1),
+                "onsets_per_sec": onsets_per_sec,
+                "peak_polyphony": peak_poly,
+            }
+            results.append(entry)
+            print(f"  [{seg_name}] -> {wav_filename} (I: {entry['integrated_lufs']:.2f} LUFS, TP: {entry['true_peak']:.2f} dBTP, Centroid: {entry['spectral_centroid_hz']} Hz, Poly: {entry['peak_polyphony']})")
 
     # Write manifest
     manifest_path = out_dir / "manifest.json"
     manifest_data = {
         "simulation": s_dir.name,
-        "duration_sec": duration_sec,
-        "presets_count": len(results),
-        "presets": results,
+        "total_duration_sec": total_dur,
+        "segments": [s[0] for s in segments],
+        "presets_count": len(AUDITION_PRESETS),
+        "results_count": len(results),
+        "results": results,
     }
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=2)
 
     # Format Markdown Table
-    print("\n" + "=" * 90)
-    print("OBJECTIVE SOUND AUDITION REPORT (12s preview)")
-    print("=" * 90)
+    print("\n" + "=" * 100)
+    print("OBJECTIVE SOUND AUDITION REPORT (2 Segments per Preset: 0-8s and 20-32s)")
+    print("=" * 100)
     print(format_markdown_table(results))
-    print("=" * 90 + "\n")
+    print("=" * 100 + "\n")
 
     return manifest_data
 
@@ -269,6 +314,7 @@ def format_markdown_table(results: List[Dict[str, Any]]) -> str:
     """Formats audition results into GitHub markdown table for docs/sims.md."""
     headers = [
         "Preset",
+        "Segment",
         "Palette",
         "Scale",
         "Integrated (LUFS)",
@@ -285,6 +331,7 @@ def format_markdown_table(results: List[Dict[str, Any]]) -> str:
     for r in results:
         row = [
             f"`{r['preset']}`",
+            r["segment"],
             r["palette"],
             r["scale"],
             f"{r['integrated_lufs']:.2f}",
@@ -302,12 +349,10 @@ def format_markdown_table(results: List[Dict[str, Any]]) -> str:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Procedural Sound Audition Runner")
     parser.add_argument("sim_dir", nargs="?", default="sims/ellipse_billiards", help="Simulation folder path")
-    parser.add_argument("--duration", type=float, default=12.0, help="Audition duration in seconds (default 12.0)")
     parser.add_argument("--output-dir", default="build/sound_audition", help="Output directory")
     args = parser.parse_args()
 
     run_sound_audition(
         sim_dir=args.sim_dir,
-        duration_sec=args.duration,
         output_dir=args.output_dir,
     )
